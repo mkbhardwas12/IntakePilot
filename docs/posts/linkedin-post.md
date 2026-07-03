@@ -4,15 +4,19 @@
 
 ---
 
-Every failed IT project starts with a requirement that meant one thing to the person who wrote it and something else to everyone downstream.
+I built and open-sourced IntakePilot. Here's its shipped demo, real numbers, reproducible in 5 minutes with "make dev" — no cloud account, no model download.
 
-AI coding agents made this worse, not better: they'll happily build the wrong thing faster. The quality ceiling of AI-generated code is set by the ticket that triggered it — and most tickets are two sentences long.
+A Finance Ops analyst types one sentence: "our monthly vendor report takes 3 days to compile by hand."
 
-So I built IntakePilot, and open-sourced it.
+Before asking her anything, the system drafts the requirement live — outcome extracted from her words (0.85 confidence), stakeholders inferred from her department, affected systems retrieved from the org glossary, data sensitivity assumed as "internal — override at confirm." Readiness: 34.
 
-A business user describes a need in plain language. The system drafts the structured requirement live, infers what it can from context and precedent, asks at most 7 questions (enforced in code, not in a prompt), and never asks a business user a technical question — backend context like SAP tables and Z-fields is auto-discovered after confirmation.
+Then it asks exactly 2 questions, with reasons, against a hard budget of 7 — enforced in Python, not in a prompt (there's a test where a malicious model tries to ask more and can't). Two chip taps: readiness 83, confirm unlocks. She fixes one system the glossary missed. Five quality gates run, and the router explains itself in writing: 'Matched 1 signal for "data-platform": "report".'
 
-From there: an optional business-analyst pass, a functional review, five quality gates, and routing to the right team queue with a written explanation. The ticket lands in Jira/ADO carrying two artifacts — the business requirement and a code scaffold — ready for an AI coding agent to implement and a developer to review. Everyone in the chain sees the same requirement, in their own language.
+The ticket that lands carries every claim with provenance + confidence, her original ask verbatim, and every assumption declared. Her one-field fix becomes a training exemplar for the next intake — the system learns your business from daily use, in ledgers, not fine-tuned weights.
+
+And business users never get technical questions: after confirmation it auto-discovers backend context itself — in the SAP demo, "order info" resolves to VBAK/VBAP and even a custom Z-field (ZZ_PRIORITY_CODE) with its owning team.
+
+From there: optional BA pass, functional review, then your PM tool. AI coding agents are only as good as the ticket that feeds them — this makes that ticket. (Jira/ADO connector + auto-attached code scaffold: on the roadmap via the same one-class protocol.)
 
 Two design choices I refuse to compromise on:
 
