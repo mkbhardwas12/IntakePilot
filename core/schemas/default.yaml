@@ -1,0 +1,49 @@
+# core/schemas/default.yaml — orgs fork this per requirement type (spec 4.2)
+#
+# askable:false = the system may NEVER ask a business user this slot;
+# it must be inferred, retrieved, defaulted, or left for tech enrichment.
+# This single flag is the "no engineering questions to business people" rule.
+slots:
+  business_outcome:
+    required: true
+    askable: true
+    label: Business outcome
+    ask_hint: "what should be different when this is done?"
+  affected_systems:
+    required: true
+    askable: false          # infer/retrieve only
+    label: Affected systems
+  urgency:
+    required: true
+    askable: true
+    label: Urgency
+    ask_hint: "how soon does this need to be live?"
+    options: [this week, this month, this quarter, no hard deadline]
+  success_criteria:
+    required: true
+    askable: true
+    label: Success criteria
+    ask_hint: "how will you know it worked?"
+  scope_boundaries:
+    required: false
+    askable: true
+    label: Scope boundaries
+    ask_hint: "anything explicitly out of scope?"
+  data_sensitivity:
+    required: true
+    askable: false
+    label: Data sensitivity
+    default: internal
+    default_reason: "org norm; override at confirm"
+  stakeholders:
+    required: false
+    askable: false          # nemawashi mining
+    label: Stakeholders
+  nfr:
+    required: false
+    askable: false          # tech enrichment
+    label: Non-functional requirements
+  backend_context:
+    required: false
+    askable: false          # ADDENDUM-01: discovered via connectors, NEVER asked
+    label: Backend context

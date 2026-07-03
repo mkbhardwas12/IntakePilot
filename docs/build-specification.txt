@@ -1,0 +1,425 @@
+
+IntakePilot
+Build Specification v1.0
+Implementation-grade specification: repo layout, schemas, interfaces, prompts, and the model-agnostic learning loop
+Hand this document to a developer or a coding agent and start building.
+Author: mkbhardwas12  |  July 2026  |  MIT
+
+Contents
+
+
+
+1. Why This Exists — The Translation Layer Problem
+Between every business need and every line of shipped code sits a human translation layer: business analysts, product owners, and intake coordinators who interview stakeholders, write user stories, chase clarifications, and route tickets. This layer is expensive, slow, and lossy — and much of its daily work is now automatable with discipline.
+1.1 What the middle layer costs
+The published evidence is consistent on three points. First, the labor itself is a major line item: business-analyst compensation in the US typically runs in the $80k–$120k+ range fully loaded, and enterprises commonly staff one analyst per one-to-two development squads — for a 500-developer organization, a translation layer of 30–60 people, i.e., $3M–$7M+ annually before overhead. Second, poor requirements are the dominant defect source: decades of industry studies (from IEEE analyses to project-failure surveys) attribute roughly 40–50% of defects and a large share of outright project failures to requirements errors, and the cost of fixing a requirements defect grows by orders of magnitude the later it is caught. Third, the intake pipeline itself burns calendar time: the gap between 'business person states a need' and 'developer has an actionable, correctly-routed ticket' is routinely days to weeks, during which value is simply waiting.
+1.2 Where agents genuinely beat the middle layer
+On the mechanical core of the analyst role, current LLMs already perform at or above median-practitioner level in published evaluations: drafting well-formed user stories with acceptance criteria, detecting ambiguity and weak language, checking completeness against a schema, and generating relevant clarifying questions. More importantly, agents beat humans structurally, not just per-task:
+	•	Availability and latency: intake at midnight on a Sunday, in any language, with a structured draft in thirty seconds — no meeting scheduled, no queue behind other stakeholders.
+	•	Perfect recall of organizational precedent: a human analyst remembers dozens of past requirements; a retrieval index remembers all of them, verbatim, with their outcomes. 'We built almost this in March' stops depending on who happens to be in the room.
+	•	Consistency: the thousandth intake gets exactly the same rigor as the first. No fatigue, no Friday-afternoon tickets, no variation between a great analyst and a mediocre one.
+	•	Compounding memory: every correction any human makes anywhere in the system improves the next intake for everyone. Human analysts learn individually and take their learning with them when they leave; the ledger learns institutionally and never resigns.
+1.3 Where humans still win — and how the design responds
+Honesty about the gap is what makes the system trustworthy. Humans retain clear advantages in tacit organizational knowledge (what is deliberately not written down), political awareness (which stakeholder must be consulted even though no document says so), conflict resolution between competing requirements, and knowing when an ask is really a symptom of a different problem. The design responds structurally rather than pretending: every one of those human strengths maps to a gate in the pipeline. Humans stop being the conveyor belt and become the quality authority — triaging gate failures, resolving conflicts the Precedent Engine surfaces, approving requirements, and reviewing agent-drafted implementations. The system does not delete the analyst role; it deletes the drudge 80% of it and concentrates the human 20% where judgment actually matters.
+1.4 The savings math, stated conservatively
+Assume a mid-size enterprise with 40 analysts at $110k loaded, handling intake for 400 developers. If the platform absorbs 65% of routine first-pass intake (drafting, clarification, structuring, routing) and cuts requirements-related rework by even a quarter — via schema enforcement, ambiguity linting, duplicate detection, and audit-trail answers to developer questions — the direct math is roughly: 40 × $110k × 0.65 ≈ $2.9M/yr of analyst capacity redeployed to higher-value work, plus rework avoidance on the development side that is typically the larger number (a 25% cut in a defect stream where requirements cause ~45% of defects, on a $60M engineering budget, is on the order of $2–4M/yr). The point of this document is not the precise figure — it is that the mechanism is buildable by one person, runs on a laptop, and every claim above is measurable inside the system itself (Section 9 defines the metrics).
+
+2. System Overview
+IntakePilot is a five-tier, provider-agnostic platform. Locally it is one docker compose up: FastAPI, Postgres with pgvector, Ollama. In cloud, the identical application code runs on AWS with Bedrock, DynamoDB, and Bedrock Knowledge Bases, selected purely by configuration. The learning loop (Section 7) is deliberately placed in the data tier so that it is independent of whichever model is doing inference.
+
+Figure 1 — Pluggable architecture: local and cloud paths, one codebase
+2.1 The pipeline in one paragraph
+A business user types an ask. The Intake Agent extracts slots into a versioned Requirement Object and shows a live Shadow Draft. The Gap Analyzer finds open slots; the Gap Resolution Ladder tries to infer them from context, then retrieve them from precedent, and only then permits the Question Composer to spend from a hard Question Budget (max 3 per turn, 7 total). When readiness is sufficient, the user reviews a plain-language render, edits anything (every edit is logged as a labeled diff), and confirms. The confirmed object passes the five-gate Jidoka pipeline; the Routing DNA classifier picks the target queue with an explanation and a confidence score; adapters create the ticket idempotently. Optionally, the Builder Agent attempts implementation in a sandbox and opens a draft PR for a human developer's verdict. Every human touch along the way — edits, answers, triage fixes, review verdicts — feeds the ledgers that make the next intake better.
+3. Repository Layout
+intakepilot/
+├── core/                        # Python package (FastAPI)
+│   ├── api/                     # routers: sessions, requirements,
+│   │                            #   confirm, webhooks, admin
+│   ├── agents/
+│   │   ├── intake.py            # slot extraction -> Shadow Draft
+│   │   ├── gap_analyzer.py      # gap scan + info-gain scoring
+│   │   ├── question_composer.py # budgeted question batches
+│   │   ├── precedent.py         # similarity search, clone-modify
+│   │   ├── renderer.py          # business view + tech spec
+│   │   └── orchestrator.py      # THE bounded loop (deterministic)
+│   ├── gates/                   # jidoka: schema, invest, ambiguity,
+│   │                            #   conflict, routing
+│   ├── learning/                # Section 7: ledgers, exemplar
+│   │                            #   selection, prompt recompile, evals
+│   ├── providers/
+│   │   ├── llm/                 # ollama.py, bedrock.py, openai_compat.py
+│   │   ├── store/               # postgres.py, dynamodb.py
+│   │   └── vector/              # pgvector.py, bedrock_kb.py
+│   ├── targets/                 # github.py, jira.py, servicenow.py, calm.py
+│   ├── builder/                 # extension: feasibility, sandbox, pr
+│   ├── models.py                # pydantic: RequirementObject et al.
+│   └── config.py                # intakepilot.yaml loader
+├── web/                         # React + TS (Vite): chat, draft panel,
+│                                #   confirm view, review view
+├── deploy/
+│   ├── docker-compose.yml       # api + postgres/pgvector + ollama + web
+│   └── sam/template.yaml        # AWS path
+├── evals/
+│   ├── golden/                  # gold intake scenarios (Section 8)
+│   └── harness.py               # benchmark gate for the learning loop
+├── docs/adr/                    # architecture decision records
+└── examples/demo-repo/          # target for the 5-minute demo
+3.1 The five-minute first run (README contract)
+git clone https://github.com/<org>/intakepilot && cd intakepilot
+docker compose up          # pulls ollama model on first start
+open http://localhost:3000
+# type: "our monthly vendor report takes 3 days to compile by hand"
+# watch the Shadow Draft build, answer <= 3 questions, confirm,
+# see the issue appear in examples/demo-repo
+
+4. Data Model — Copy-Paste Ready
+4.1 The Requirement Object (pydantic)
+class Provenance(str, Enum):
+    EXTRACTED = "extracted"   # from user text
+    INFERRED  = "inferred"    # from context (role, dept, history)
+    RETRIEVED = "retrieved"   # from precedent / glossary
+    ANSWERED  = "answered"    # user answered a question
+    ASSUMED   = "assumed"     # budget exhausted, default applied
+    EDITED    = "edited"      # human corrected at confirmation
+ 
+class Slot(BaseModel):
+    value: Any | None = None
+    provenance: Provenance | None = None
+    confidence: float = 0.0
+    source: str | None = None      # precedent id, question id, ...
+    default_reason: str | None = None
+ 
+class RequirementObject(BaseModel):
+    req_id: str                    # "IPR-{yyyy}-{seq:06d}"
+    version: int = 1
+    status: Status = Status.DRAFT  # draft|questioning|awaiting_confirmation
+                                   # |confirmed|gated|routed|building
+                                   # |in_review|done|rejected
+    requester: Requester
+    ask_verbatim: str              # NEVER mutated; the original words
+    slots: dict[str, Slot]         # keys from the active slot schema
+    question_budget: Budget        # {max: 7, per_turn: 3, spent: 0}
+    assumptions: list[str] = []    # slot keys with provenance=assumed
+    readiness_score: int = 0
+    confirmation: Confirmation | None = None
+    routing: RoutingDecision | None = None
+    audit: list[AuditEvent] = []   # append-only, every transition
+4.2 The default slot schema (YAML, org-customizable)
+# core/schemas/default.yaml — orgs fork this per requirement type
+slots:
+  business_outcome:   { required: true,  askable: true,
+    ask_hint: "what should be different when this is done?" }
+  affected_systems:   { required: true,  askable: false }  # infer/retrieve only
+  urgency:            { required: true,  askable: true }
+  success_criteria:   { required: true,  askable: true }
+  scope_boundaries:   { required: false, askable: true }
+  data_sensitivity:   { required: true,  askable: false,
+    default: "internal", default_reason: "org norm; override at confirm" }
+  stakeholders:       { required: false, askable: false }  # nemawashi mining
+  nfr:                { required: false, askable: false }  # tech enrichment
+ 
+# askable:false = the system may NEVER ask a business user this slot;
+# it must be inferred, retrieved, defaulted, or left for tech enrichment.
+# This single flag is the "no engineering questions to business people" rule.
+4.3 Postgres DDL (local reference; DynamoDB mapping mirrors it)
+CREATE TABLE requirements (
+  req_id TEXT, version INT, obj JSONB NOT NULL,
+  embedding VECTOR(768),            -- of business_outcome + ask
+  created_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (req_id, version));
+ 
+CREATE TABLE sessions (
+  session_id TEXT PRIMARY KEY, req_id TEXT,
+  turns JSONB, budget_spent INT DEFAULT 0,
+  updated_at TIMESTAMPTZ);
+ 
+CREATE TABLE edit_diffs (            -- THE learning asset
+  id BIGSERIAL PRIMARY KEY,
+  req_id TEXT, version INT, slot_key TEXT,
+  proposed JSONB, corrected JSONB,
+  context_bucket TEXT,               -- dept x req_type
+  ask_embedding VECTOR(768),         -- for relevance retrieval
+  created_at TIMESTAMPTZ DEFAULT now());
+ 
+CREATE TABLE question_ledger (
+  id BIGSERIAL PRIMARY KEY, req_id TEXT, slot_key TEXT,
+  question TEXT, outcome TEXT,       -- answered|skipped|dont_know
+  changed_routing BOOL, changed_slots INT);
+ 
+CREATE TABLE outcome_ledger (
+  id BIGSERIAL PRIMARY KEY, req_id TEXT,
+  stage TEXT,                        -- gate1..5 | build | review
+  verdict TEXT, detail JSONB,
+  created_at TIMESTAMPTZ DEFAULT now());
+ 
+CREATE TABLE glossary (
+  term TEXT PRIMARY KEY, maps_to JSONB,   -- {systems:[], team:, synonyms:[]}
+  evidence_count INT DEFAULT 1, last_confirmed TIMESTAMPTZ);
+ 
+CREATE TABLE prompt_configs (        -- versioned, eval-gated (Section 7.4)
+  config_id TEXT PRIMARY KEY, agent TEXT, version INT,
+  exemplar_ids BIGINT[], instructions_hash TEXT,
+  eval_score JSONB, status TEXT);    -- candidate|active|rolled_back
+
+5. Provider Interfaces — The Portability Contract
+No business logic may import a provider SDK. Three protocols, registered by name, selected in intakepilot.yaml. Any capable instruction-following model works because all learned knowledge arrives via the prompt (Section 7), and structured outputs are validated and retried, not trusted.
+class LLMProvider(Protocol):
+    name: str
+    async def complete(self, messages: list[Msg], *,
+        json_schema: dict | None = None,
+        temperature: float = 0.1, max_tokens: int = 2048) -> LLMResult: ...
+    async def embed(self, texts: list[str]) -> list[list[float]]: ...
+ 
+# ollama.py    -> /api/chat with format=json when schema given
+# bedrock.py   -> converse API, toolChoice for schema enforcement
+# openai_compat.py -> /v1/chat/completions, response_format json_schema
+#
+# Wrapper policy (applies to ALL providers, in one place):
+#   - validate json against schema; on failure retry once with the
+#     validation error appended; on second failure raise ExtractionError
+#     (the orchestrator degrades gracefully: keeps prior slots, flags turn)
+ 
+class Store(Protocol):
+    async def put_version(self, obj: RequirementObject) -> None      # append-only
+    async def latest(self, req_id: str) -> RequirementObject
+    async def log(self, table: str, row: dict) -> None               # ledgers
+    async def query_ledger(self, table: str, **filters) -> list[dict]
+ 
+class VectorIndex(Protocol):
+    async def upsert(self, id: str, text: str, meta: dict) -> None
+    async def search(self, text: str, k: int = 5,
+                     filter: dict | None = None) -> list[Hit]
+ 
+class TargetPlugin(Protocol):
+    name: str
+    async def create_item(self, obj, render: TechRender) -> TargetRef
+    async def register_webhook(self, url: str) -> None
+    async def parse_status_event(self, payload: dict) -> StatusUpdate
+6. The Orchestrator — Deterministic Control, LLM as Component
+
+Figure 2 — Gap Resolution Ladder and Question Budget
+6.1 The turn loop (pseudocode to implement verbatim)
+async def handle_turn(session, user_msg):
+    obj = await store.latest(session.req_id)
+    # 1. EXTRACT (LLM proposes; code validates)
+    exemplars = await learning.select_exemplars(          # Section 7.2
+        agent="intake", context=obj.context_bucket, ask=user_msg, k=4)
+    extraction = await llm.complete(
+        prompts.extract(obj, user_msg, exemplars),
+        json_schema=SLOT_EXTRACTION_SCHEMA)
+    obj = merge_slots(obj, extraction)   # never overwrite ANSWERED/EDITED
+ 
+    # 2. GAP LADDER (deterministic order)
+    gaps = open_required_slots(obj)
+    gaps = await infer_pass(obj, gaps)      # role/dept/org context
+    gaps = await retrieve_pass(obj, gaps)   # precedent + glossary
+ 
+    # 3. QUESTIONS (budget enforced in code, NOT in prompt)
+    questions = []
+    if gaps and obj.question_budget.spent < obj.question_budget.max:
+        ranked = await gap_analyzer.rank(obj, gaps)   # info-gain
+        ranked = [g for g in ranked if schema[g.key].askable]
+        n = min(len(ranked), PER_TURN,
+                obj.question_budget.max - obj.question_budget.spent)
+        questions = await composer.compose(obj, ranked[:n])
+        obj.question_budget.spent += len(questions)
+ 
+    # 4. BUDGET EXHAUSTED -> assumptions with stated defaults
+    if not questions:
+        obj = apply_defaults(obj, remaining=gaps)
+ 
+    # 5. READINESS + RENDER + PERSIST (append version, stream deltas)
+    obj.readiness_score = readiness(obj)
+    await store.put_version(obj)
+    return TurnResult(draft=obj, questions=questions,
+                      confirm_unlocked=obj.readiness_score >= 70)
+6.2 Core prompts (initial versions; the loop will improve them)
+Prompts ship as versioned files under core/agents/prompts/. The extraction prompt is the one the learning loop rewrites most, so its structure matters:
+# extract.md (system)
+You extract requirement slots from a business message.
+Rules:
+- Use ONLY the user message, the conversation, and the provided
+  retrieved context. If a slot is not clearly supported, leave it null.
+- Never invent systems, dates, or names. Confidence reflects evidence.
+- Output JSON matching the provided schema. Nothing else.
+ 
+## Retrieved organizational context
+{glossary_hits}{precedent_snippets}
+ 
+## Examples of past corrections in this context   <- LEARNING LIVES HERE
+{exemplars}   # "proposed X, the human corrected to Y, because context Z"
+ 
+# question.md (system) — composes ONE batch
+For each gap, write one question a non-technical person can answer
+in a sentence. Attach a because-clause from its gap score.
+Offer 2-4 tappable options when the answer space is enumerable.
+Never ask about: {unaskable_slots}. Never re-ask: {answered}.
+6.3 Confirmation & gates (implement as pure functions)
+
+Figure 3 — Five-gate pipeline with human triage lane
+Gates 1 and 3 are deterministic (JSON-schema validation; weak-word list plus context check). Gates 2, 4, 5 use the LLM as a scored rubric with the same validate-and-retry wrapper. Every gate returns pass or a structured failure {gate, reason, suggestion}; failures never mutate the object — they route it to the triage queue, and the human resolution is logged to outcome_ledger.
+
+7. The Learning Loop — First-Class, Model-Agnostic
+This is the section that makes the system beat a static middle layer over time, and it is designed so that not one byte of learned knowledge lives in model weights. Swap the LLM provider tomorrow — local 14B model to a frontier API or back — and the system keeps everything it has learned, because everything it has learned is rows in Postgres injected at prompt time. The loop is: capture signals, distill nightly, inject at inference, and gate every change behind a benchmark.
+
+Figure 4 — The learning loop: signals to ledgers to distillation to injection, benchmark-gated
+7.1 Signal capture (free — humans already do these actions)
+Human action
+Captured as
+Teaches the system
+Edits a field at confirmation
+edit_diffs row: proposed vs corrected + context + embedding
+Extraction errors by field and context; org vocabulary
+Answers / skips / 'don't know's a question
+question_ledger row with downstream effect (changed slots? changed routing?)
+Which questions carry information; which slot gaps to stop asking about
+Fixes a gate failure in triage
+outcome_ledger row with resolution diff
+What INVEST/ambiguity/conflict failures look like locally
+Reviews an agent PR (approve/revise/reject + comments)
+outcome_ledger row per attempt
+Which work classes the Builder Agent is trusted with
+Confirms a requirement containing new term mappings
+glossary upsert with evidence_count++
+Business term to systems-and-team ontology, grown from real usage
+7.2 Exemplar selection — corrections become few-shot teaching
+async def select_exemplars(agent, context, ask, k=4):
+    """Relevance-ranked past corrections, injected into prompts."""
+    hits = await vector.search(ask, k=k*3, filter={
+        "table": "edit_diffs", "context_bucket": context})
+    hits = dedupe_by_slot(hits)          # max 2 per slot_key
+    hits = [h for h in hits if h.age_days < STALENESS_DAYS]  # default 180
+    return format_as_examples(hits[:k])
+    # "For a Finance Ops ask like <snippet>, the draft proposed
+    #  affected_systems=[S4P]; the requester corrected it to
+    #  [S4P-FIN, BW4] — reports in this dept usually touch BW4."
+This is retrieval-augmented correction memory: the cheapest and most robust form of learning, it works identically through any LLMProvider, and it is auditable — you can print exactly which past corrections influenced any given draft.
+7.3 Nightly distillation jobs (deterministic, no fine-tuning)
+	•	Exemplar curation: recompute the top exemplar candidates per (agent, context_bucket); demote stale or superseded corrections; cap per-bucket banks (e.g., 50) so retrieval stays sharp.
+	•	Question pruning: from question_ledger, compute per-slot information value (answer rate x downstream change rate). Slots whose questions are consistently skipped or change nothing get their ask priority lowered or their default promoted — the system literally learns to ask less.
+	•	Glossary consolidation: mine confirmed requirements for term-to-system-to-team mappings; promote to glossary at evidence_count >= 3; glossary hits then serve the INFER and RETRIEVE ladder steps for every future intake.
+	•	Prompt recompile (optional, DSPy-style): periodically re-select the instruction phrasing and exemplar mix per agent by evaluating candidate configs against the golden set; emit a prompt_configs row with status=candidate. Because optimization only rearranges prompt-side material, it remains provider-agnostic.
+	•	Threshold recalibration: routing-confidence and builder-feasibility thresholds recomputed per class from outcome_ledger verdicts — trust is earned narrowly and expanded on evidence.
+7.4 The benchmark gate — the loop can never make things worse
+# evals/harness.py — runs in CI and before any config promotion
+GOLDEN = load("evals/golden/*.yaml")   # >= 40 scenarios: ask +
+                                       # scripted answers + gold object
+for cfg in candidate_configs:
+    m = run_all(GOLDEN, cfg)   # metrics per scenario:
+    #   slot_f1, questions_asked, wrong_question_rate,
+    #   readiness_at_confirm, routing_accuracy
+    promote(cfg) if m >= active_metrics - EPS else rollback(cfg)
+ 
+# Invariants:
+# 1. No prompt_config reaches status=active without beating or
+#    matching the current one on the golden set.
+# 2. The golden set grows: every triage resolution and every
+#    high-signal edit can be promoted (by a human) into a scenario.
+# 3. Per-provider baselines: the harness runs against each configured
+#    LLM so the README can state honestly which models pass.
+This closes the classic failure modes of self-improving systems: feedback amplification is blocked because human corrections (not model outputs) are the only training signal; drift is blocked because promotion is benchmark-gated with rollback; staleness is handled by age-based demotion; and a model swap simply re-runs the harness to re-baseline — the ledgers, glossary, and exemplar banks carry over untouched.
+7.5 Cold start
+Before any corrections exist: ship 15–20 hand-written synthetic exemplars per default context; seed the glossary from any existing system inventory or wiki export the adopter has (a one-time importer CLI is part of core); and let the Precedent Engine index historical tickets via the target plugin's backfill method (github: closed issues; jira: JQL export). The loop takes over from the first real confirmation.
+
+8. Builder Agent Extension (v0.2, off by default)
+
+Figure 5 — Builder loop: feasibility, sandbox, developer gate, outcome learning
+# builder/feasibility.py
+score = w1*scope_size(obj)            # slots -> estimated diff size
+      + w2*blast_radius(repo, obj)    # touched components centrality
+      + w3*test_coverage(repo, area)
+      + w4*precedent_success(class_)  # from outcome_ledger
+# below cfg.builder.threshold (default 0.7) -> human-first, untouched
+ 
+# builder/runner.py — invariants enforced OUTSIDE the agent:
+#  - ephemeral container, branch-scoped token, no secrets mounted
+#  - must produce: diff + passing tests + self_review.md
+#    (self_review REQUIRED to state lowest-confidence areas)
+#  - opens DRAFT PR labeled agent-authored, links req_id + audit trail
+#  - can never merge (branch protection), max 2 revision attempts,
+#    then mandatory human-first handoff
+#  - requester notified at: build started / PR ready / merged
+Review verdicts and comments land in outcome_ledger and feed both feasibility recalibration (7.3) and, when the reviewer's comments correct a misreading of the requirement, new edit-diff exemplars — the two ends of the pipeline teach each other.
+9. Metrics — Prove the Middle-Layer Claim With Your Own Data
+Metric
+Definition
+Claim it proves
+Intake latency
+ask timestamp to routed-ticket timestamp
+Days-to-weeks becomes minutes
+Edit rate / field
+confirmation edits ÷ drafts, per slot, trend
+The system learns the org (must trend down)
+Questions per intake
+budget spent, trend
+Learns to ask less (7.3 pruning working)
+Clarification round-trips
+post-routing questions from devs to requester
+Audit trail kills the second interrogation
+Routing accuracy
+tickets not re-routed after creation
+Beats manual triage
+Duplicate catch rate
+conflicts caught at Gate 4 ÷ total
+Precedent memory beats human recall
+Analyst-hours displaced
+intakes x baseline handling time
+The Section 1.4 math, measured not asserted
+Builder approval rate
+approved PRs ÷ attempts, per class
+Earned autonomy curve
+All metrics are computed from the ledgers — no extra instrumentation. Ship a /metrics dashboard page in web/ from day one; it is both the adopter's ROI report and the project's public proof.
+10. Build Order — Hand These Milestones to a Coding Agent
+#
+Milestone
+Contents
+Done when
+1
+Skeleton + providers
+repo layout, config loader, LLMProvider (ollama + openai_compat), Store (postgres), docker-compose
+pytest green; /health up; a prompt round-trips through Ollama
+2
+Requirement core
+pydantic models, DDL migrations, versioned store, slot schema loader
+put/latest round-trip; append-only enforced by test
+3
+Turn loop
+orchestrator 6.1, extract prompt + validation wrapper, gap ladder (infer+retrieve stubs), budget, readiness
+golden scenario #1 passes end-to-end in CLI
+4
+Web UI
+chat + Shadow Draft panel (SSE), provenance badges, confirm/edit/reject view, assumption register
+5-minute demo works in browser
+5
+Ledgers + learning v1
+edit_diffs capture on confirm-edits, exemplar selection 7.2, injection into extract prompt
+an induced correction visibly changes the next similar draft
+6
+Gates + routing + GitHub
+five gates, triage queue UI, routing classifier, github target + webhook status sync
+confirmed req becomes a labeled issue in demo-repo; failures land in triage
+7
+Eval harness + nightly jobs
+golden set (40 scenarios), harness.py, distillation jobs 7.3, prompt_configs gate
+CI blocks a deliberately-degraded config; nightly job prunes a low-value question
+8
+Precedent + glossary
+vector backfill from target, clone-and-modify UX, glossary mining + importer CLI
+'we built this before' offer appears for a near-duplicate ask
+9
+Cloud path
+bedrock + dynamodb + bedrock_kb providers, SAM template
+same golden set passes on AWS deploy
+10
+Builder v0.2
+feasibility, sandbox runner, draft-PR flow, review capture, thresholds from ledger
+agent PR approved by human in demo-repo, invariants tested
+Milestones 1–6 are the usable product (roughly 4–5 weeks solo). 7–8 make it self-improving. 9–10 make it cloud-ready and delivery-capable. Each milestone is sized to be a single coding-agent work order: this section plus Sections 4–7 are the complete specification for it.
+11. Non-Negotiable Invariants (encode as tests)
+	•	The model never controls the loop: budgets, ladder order, gate outcomes, and merges are decided by deterministic code; tests assert the orchestrator ignores model attempts to exceed them.
+	•	askable:false slots can never reach the Question Composer — business users are never asked engineering questions.
+	•	ask_verbatim is immutable; ANSWERED and EDITED slots are never overwritten by extraction.
+	•	Nothing routes without a confirmation record; nothing merges without a human approval; both are schema-level constraints, not conventions.
+	•	Only human-originated signals enter the ledgers — model outputs never train the system on themselves.
+	•	No prompt_config activates without passing the golden-set gate; rollback is one UPDATE.
+	•	Provider SDK imports outside core/providers/ fail CI (a lint rule ships in the repo).

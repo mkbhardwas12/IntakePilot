@@ -1,0 +1,50 @@
+# Example SAP S/4 system fixture (ADDENDUM-01) — drives the FixtureConnector
+# so the backend-discovery demo runs fully offline. A real SAP connector
+# (OData/RFC) implements the same SystemConnector protocol on the cloud path.
+system: sap_s4_demo
+label: SAP S/4HANA (demo)
+kind: sap
+entities:
+  sales_order:
+    label: Sales order
+    backend_name: VBAK/VBAP
+    area: sales
+    description: Sales order header and line items.
+    synonyms: [order, orders, order info, order information, sales order, sales orders]
+    standard_fields:
+      - { name: VBELN, type: CHAR(10), description: Sales document number }
+      - { name: AUART, type: CHAR(4),  description: Sales document type }
+      - { name: NETWR, type: CURR(15), description: Net order value }
+      - { name: KUNNR, type: CHAR(10), description: Sold-to party }
+    customizations:
+      - name: ZZ_PRIORITY_CODE
+        type: CHAR(2)
+        kind: z_field
+        owner_team: order-management
+        description: Custom order priority set by fulfillment planning; drives expedite handling.
+      - name: ZZ_EXPEDITE_FLAG
+        type: CHAR(1)
+        kind: append_field
+        owner_team: order-management
+        description: Append field marking orders under an expedite agreement.
+  material:
+    label: Material master
+    backend_name: MARA
+    area: logistics
+    description: Material (goods/product) master data.
+    synonyms: [goods, goods details, material, materials, product, products, product line, product lines]
+    standard_fields:
+      - { name: MATNR, type: CHAR(18), description: Material number }
+      - { name: MTART, type: CHAR(4),  description: Material type }
+      - { name: MATKL, type: CHAR(9),  description: Material group }
+    customizations:
+      - name: ZZ_PRODUCT_LINE
+        type: CHAR(10)
+        kind: append_field
+        owner_team: master-data
+        description: Custom product-line grouping used by sales reporting; not a standard SAP field.
+      - name: ZZ_LIFECYCLE_STAGE
+        type: CHAR(2)
+        kind: z_field
+        owner_team: master-data
+        description: Custom lifecycle stage (NPI/active/end-of-life) maintained by product ops.

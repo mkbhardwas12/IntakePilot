@@ -1,0 +1,39 @@
+# Example non-SAP system fixture (ADDENDUM-01): a plain application database
+# with customized columns — proves the discovery flow is domain-agnostic.
+system: fulfillment_db
+label: Fulfillment DB (Postgres)
+kind: sql
+entities:
+  orders:
+    label: orders table
+    backend_name: public.orders
+    area: fulfillment
+    description: Operational order records synced from commerce.
+    synonyms: [order, orders, order info, order records]
+    standard_fields:
+      - { name: id, type: bigint, description: Order id }
+      - { name: customer_id, type: bigint, description: Customer reference }
+      - { name: status, type: text, description: Fulfillment status }
+      - { name: placed_at, type: timestamptz, description: Order placement time }
+    customizations:
+      - name: priority_override
+        type: text
+        kind: custom_column
+        owner_team: fulfillment-ops
+        description: Custom column added by ops to force carrier priority; not in the vendor schema.
+  shipments:
+    label: shipments table
+    backend_name: public.shipments
+    area: fulfillment
+    description: Shipment legs per order.
+    synonyms: [shipment, shipments, delivery, deliveries]
+    standard_fields:
+      - { name: id, type: bigint, description: Shipment id }
+      - { name: order_id, type: bigint, description: Order reference }
+      - { name: carrier, type: text, description: Carrier code }
+    customizations:
+      - name: dock_door_hint
+        type: text
+        kind: custom_column
+        owner_team: warehouse-systems
+        description: Custom column used by the warehouse routing script.

@@ -1,0 +1,23 @@
+"""Store protocol (spec Section 5) plus the session/sequence surface the API needs."""
+from __future__ import annotations
+
+from typing import Protocol, runtime_checkable
+
+from core.models import RequirementObject
+
+
+class AppendOnlyViolation(Exception):
+    """(req_id, version) already exists — versions are immutable."""
+
+
+@runtime_checkable
+class Store(Protocol):
+    async def put_version(self, obj: RequirementObject) -> None: ...   # append-only
+    async def latest(self, req_id: str) -> RequirementObject: ...
+    async def history(self, req_id: str) -> list[RequirementObject]: ...
+    async def log(self, table: str, row: dict) -> None: ...            # ledgers
+    async def query_ledger(self, table: str, **filters) -> list[dict]: ...
+    async def put_session(self, session: dict) -> None: ...
+    async def get_session(self, session_id: str) -> dict | None: ...
+    async def list_sessions(self) -> list[dict]: ...
+    async def next_seq(self, year: int) -> int: ...

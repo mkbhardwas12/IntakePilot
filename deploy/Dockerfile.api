@@ -1,0 +1,16 @@
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt pyproject.toml ./
+RUN pip install --no-cache-dir -r requirements.txt "asyncpg>=0.30"
+COPY core ./core
+COPY intakepilot.yaml ./
+# Non-root runtime user; data/ and demo-repo/ must stay writable by it.
+# (Dev compose bind-mounts examples/demo-repo from the host — on Linux hosts
+# run `chown -R 10001 examples/demo-repo` once, or use the prod compose file,
+# which uses a named volume instead.)
+RUN mkdir -p data examples/demo-repo \
+    && useradd -u 10001 -m app \
+    && chown -R app:app /app
+USER app
+EXPOSE 8000
+CMD ["uvicorn", "core.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,16 @@
+# Repo-root build context (Dockerfile.api, Dockerfile.web.prod)
+.git
+.venv
+data
+web/node_modules
+web/dist
+__pycache__
+**/__pycache__
+.pytest_cache
+uiverify
+.uiverify
+.ui-verify
+examples/demo-repo/IPR-*.md
+docs
+*.md
+!README.md

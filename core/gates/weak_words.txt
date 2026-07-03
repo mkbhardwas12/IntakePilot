@@ -1,0 +1,28 @@
+# Gate 3 ambiguity lint — weak/ambiguous words (org policy; edit freely).
+# One term per line. A term is flagged only when the containing slot value
+# has no concrete number or date near it (the "context check").
+asap
+soon
+quickly
+fast
+some
+several
+various
+etc
+somehow
+better
+user-friendly
+easy
+simple
+flexible
+robust
+efficient
+appropriate
+as needed
+tbd
+maybe
+possibly
+handle
+support
+improve
+optimize

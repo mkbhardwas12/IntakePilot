@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+data/
+web/node_modules/
+web/dist/
+examples/demo-repo/IPR-*.md
+.pytest_cache/
+.DS_Store
+# scratch UI-verification harnesses (see PROJECT-REVIEW.md — safe to delete)
+uiverify/
+.uiverify/
+.ui-verify/
+# accidental npm stub at repo root; the real lockfile is web/package-lock.json
+/package-lock.json
+.env
+*.log
