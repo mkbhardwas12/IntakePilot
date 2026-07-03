@@ -1,0 +1,19 @@
+# Golden intake scenario #1 (spec Section 8 / 7.4). The full 40-scenario set
+# and evals/harness.py are Milestone 7; this scenario is exercised today by
+# tests/test_e2e.py::test_golden_scenario_vendor_report.
+id: scenario_001
+ask: "our monthly vendor report takes 3 days to compile by hand"
+requester: { name: Demo User, dept: Finance Ops, role: Analyst }
+scripted_answers:
+  urgency: "this month"
+  success_criteria: "report compiles in under 1 hour"
+gold:
+  slots:
+    business_outcome: { provenance: extracted, contains: "vendor report" }
+    affected_systems: { provenance: retrieved, contains: "ERP-VendorMaster" }
+    urgency: { provenance: answered, value: "this month" }
+    success_criteria: { provenance: answered }
+    data_sensitivity: { provenance: assumed, value: internal }
+  questions_asked_max: 3
+  readiness_at_confirm_min: 70
+  routing_queue: data-platform

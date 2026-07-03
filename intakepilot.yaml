@@ -1,0 +1,49 @@
+# IntakePilot configuration — providers registered by name (spec Section 5).
+# Env overrides: INTAKEPILOT_LLM, INTAKEPILOT_STORE, INTAKEPILOT_VECTOR.
+# Setting DATABASE_URL switches the store to postgres automatically.
+provider:
+  llm: mock          # mock | ollama | openai_compat
+  store: sqlite      # sqlite | postgres
+  vector: local      # local | pgvector
+  connector: fixture # fixture | none  (real SAP/JDBC connectors: cloud path)
+
+llm:
+  mock: { dim: 768 }
+  ollama:
+    base_url: http://localhost:11434
+    model: llama3.1
+    embed_model: nomic-embed-text
+    timeout_seconds: 120
+  openai_compat:
+    base_url: https://api.openai.com/v1
+    model: gpt-4o-mini
+    embed_model: text-embedding-3-small
+    api_key_env: OPENAI_API_KEY
+
+store:
+  sqlite: { path: data/intakepilot.db }
+  postgres: {}       # dsn from DATABASE_URL
+
+vector:
+  local: { path: data/vector_index.json, dim: 768 }
+  pgvector: { dim: 768 }
+
+connectors:
+  fixture: { dir: core/schemas/systems }   # ADDENDUM-01 demo systems
+
+budget: { max: 7, per_turn: 3 }
+readiness: { confirm_threshold: 70 }
+
+routing:
+  queues:
+    - name: data-platform
+      keywords: [report, dashboard, data, etl, pipeline, analytics, compile, export, metric]
+    - name: integrations
+      keywords: [api, sync, webhook, integration, connect, import, feed]
+    - name: internal-tools
+      keywords: [form, workflow, portal, tool, automate, manual, process, approval]
+    - name: platform-security
+      keywords: [access, permission, login, security, sso, audit, compliance]
+
+demo_repo: examples/demo-repo
+metrics: { analyst_baseline_hours: 2.0 }

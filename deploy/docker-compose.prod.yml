@@ -1,0 +1,84 @@
+# Production-shaped stack — built web bundle behind nginx, env-driven secrets,
+# healthchecks, restart policies, non-root API. Works the same on an on-prem
+# host, an air-gapped network, or any cloud VM.
+#
+#   cd deploy
+#   cp .env.example .env        # set POSTGRES_PASSWORD (and LLM choice)
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# With the bundled local LLM (Ollama):
+#   docker compose -f docker-compose.prod.yml --profile local-llm up -d --build
+#   docker compose -f docker-compose.prod.yml exec ollama ollama pull llama3.1
+#
+# With an external OpenAI-compatible endpoint (vLLM, LiteLLM, Azure OpenAI,
+# an internal gateway): set INTAKEPILOT_LLM=openai_compat and OPENAI_BASE_URL
+# in .env — no Ollama container needed.
+#
+# NOTE: IntakePilot has no built-in authentication yet. Do not expose WEB_PORT
+# to the internet directly — front it with your SSO/reverse proxy (e.g.
+# oauth2-proxy, Authelia, an ALB with OIDC) or keep it on an internal network.
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-intakepilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-intakepilot}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-intakepilot}"]
+      interval: 5s
+      retries: 12
+    restart: unless-stopped
+    # No host port: the DB is reachable only on the compose network.
+    # For a managed/external Postgres instead, remove this service and set
+    # DATABASE_URL on the api service.
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-intakepilot}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}@db:5432/${POSTGRES_DB:-intakepilot}
+      INTAKEPILOT_LLM: ${INTAKEPILOT_LLM:-ollama}
+      INTAKEPILOT_VECTOR: ${INTAKEPILOT_VECTOR:-pgvector}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      db: { condition: service_healthy }
+    volumes:
+      # Named volume (not a host bind) so the non-root container user can
+      # write routed tickets regardless of host-side UIDs.
+      - tickets:/app/examples/demo-repo
+    healthcheck:
+      test: ["CMD", "python3", "-c",
+             "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status==200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web.prod
+    ports:
+      - "${WEB_PORT:-80}:80"
+    depends_on:
+      api: { condition: service_healthy }
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["local-llm"]
+    volumes:
+      - ollama:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  ollama:
+  tickets:

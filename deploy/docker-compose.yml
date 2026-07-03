@@ -1,0 +1,52 @@
+# Full local stack per spec Section 2: api + postgres/pgvector + ollama + web.
+# For a zero-dependency run without Docker, use `make dev` at the repo root
+# (mock LLM + SQLite; no model download, no containers).
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: intakepilot
+      POSTGRES_PASSWORD: intakepilot
+      POSTGRES_DB: intakepilot
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U intakepilot"]
+      interval: 5s
+      retries: 10
+
+  ollama:
+    image: ollama/ollama:latest
+    ports: ["11434:11434"]
+    volumes: [ollama:/root/.ollama]
+    # First start: docker compose exec ollama ollama pull llama3.1
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    environment:
+      DATABASE_URL: postgresql://intakepilot:intakepilot@db:5432/intakepilot
+      INTAKEPILOT_LLM: ollama
+      INTAKEPILOT_VECTOR: pgvector
+      OLLAMA_BASE_URL: http://ollama:11434
+    ports: ["8000:8000"]
+    depends_on:
+      db: { condition: service_healthy }
+      ollama: { condition: service_started }
+    volumes:
+      - ../examples/demo-repo:/app/examples/demo-repo
+
+  web:
+    build:
+      context: ../web
+      dockerfile: ../deploy/Dockerfile.web
+    environment:
+      # Inside the container, "localhost" is the web container itself.
+      INTAKEPILOT_API_URL: http://api:8000
+    ports: ["3000:3000"]
+    depends_on: [api]
+
+volumes:
+  pgdata:
+  ollama:
