@@ -84,26 +84,82 @@ def _validate(data: Any, schema: dict) -> list[str]:
     return errors
 
 
+class EscalatingLLM:
+    """Two-tier provider for the hybrid model strategy.
+
+    `primary` (typically a local/open-weight model) answers every call.
+    When a structured completion fails validation twice, `complete_validated`
+    makes ONE final attempt on `escalation` — a stronger model, which can be
+    a cloud frontier endpoint or a bigger internal one. As the learning
+    ledger accumulates exemplars from daily usage, the primary succeeds more
+    often and escalations (the expensive tokens) become rare.
+
+    Embeddings ALWAYS use the primary so the vector index stays
+    dimensionally consistent.
+    """
+
+    def __init__(self, primary: LLMProvider, escalation: LLMProvider):
+        self.primary = primary
+        self.escalation = escalation
+        self.name = f"{primary.name}+{escalation.name}"
+
+    async def complete(self, messages: list[Msg], *,
+                       json_schema: dict | None = None,
+                       temperature: float = 0.1,
+                       max_tokens: int = 2048) -> LLMResult:
+        return await self.primary.complete(
+            messages, json_schema=json_schema,
+            temperature=temperature, max_tokens=max_tokens)
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        return await self.primary.embed(texts)
+
+
+def _parse(result: LLMResult, json_schema: dict) -> tuple[Any, str | None]:
+    """Parse + validate one completion. Returns (data, None) or (None, failure)."""
+    try:
+        data = result.json()
+    except (json.JSONDecodeError, ValueError) as exc:
+        return None, f"invalid JSON: {exc}"
+    errors = _validate(data, json_schema)
+    if errors:
+        return None, "; ".join(errors)
+    return data, None
+
+
+def _retry_messages(messages: list[Msg], result: LLMResult, failure: str) -> list[Msg]:
+    return messages + [
+        Msg(role="assistant", content=result.text[:2000]),
+        Msg(role="user", content=(
+            "Your previous output failed validation with: "
+            f"{failure}. Output ONLY corrected JSON matching the schema.")),
+    ]
+
+
 async def complete_validated(provider: LLMProvider, messages: list[Msg],
                              json_schema: dict, **kw) -> Any:
-    """The one wrapper. Never trust structured output; validate, retry once, raise."""
+    """The one wrapper. Never trust structured output; validate, retry once,
+    escalate once to the stronger model if one is configured, then raise."""
     result = await provider.complete(messages, json_schema=json_schema, **kw)
-    for attempt in range(2):
-        try:
-            data = result.json()
-            errors = _validate(data, json_schema)
-            if not errors:
-                return data
-            failure = "; ".join(errors)
-        except (json.JSONDecodeError, ValueError) as exc:
-            failure = f"invalid JSON: {exc}"
-        if attempt == 1:
-            raise ExtractionError(failure)
-        retry_messages = messages + [
-            Msg(role="assistant", content=result.text[:2000]),
-            Msg(role="user", content=(
-                "Your previous output failed validation with: "
-                f"{failure}. Output ONLY corrected JSON matching the schema.")),
-        ]
-        result = await provider.complete(retry_messages, json_schema=json_schema, **kw)
-    raise ExtractionError("unreachable")
+    data, failure = _parse(result, json_schema)
+    if failure is None:
+        return data
+
+    retry = _retry_messages(messages, result, failure)
+    result = await provider.complete(retry, json_schema=json_schema, **kw)
+    data, failure = _parse(result, json_schema)
+    if failure is None:
+        return data
+
+    # Both primary attempts failed: one final attempt on the escalation
+    # tier (EscalatingLLM only). Same messages, same validation, no loop.
+    escalation = getattr(provider, "escalation", None)
+    if escalation is not None:
+        result = await escalation.complete(
+            _retry_messages(messages, result, failure),
+            json_schema=json_schema, **kw)
+        data, failure = _parse(result, json_schema)
+        if failure is None:
+            return data
+
+    raise ExtractionError(failure)

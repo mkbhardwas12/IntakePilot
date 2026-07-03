@@ -3,6 +3,11 @@
 # Setting DATABASE_URL switches the store to postgres automatically.
 provider:
   llm: mock          # mock | ollama | openai_compat
+  # Hybrid model strategy (optional): a stronger model that answers ONLY when
+  # the primary fails structured-output validation twice. Point it at a cloud
+  # frontier endpoint or a bigger internal model; as daily usage fills the
+  # learning ledger, escalations become rare. Env: INTAKEPILOT_LLM_ESCALATION.
+  # llm_escalation: openai_compat
   store: sqlite      # sqlite | postgres
   vector: local      # local | pgvector
   connector: fixture # fixture | none  (real SAP/JDBC connectors: cloud path)
@@ -19,6 +24,12 @@ llm:
     model: gpt-4o-mini
     embed_model: text-embedding-3-small
     api_key_env: OPENAI_API_KEY
+
+# Optional config override for the escalation tier — e.g. a bigger model on
+# the same provider. Falls back to the provider's entry under `llm:` above.
+# llm_escalation:
+#   base_url: http://localhost:11434
+#   model: llama3.1:70b
 
 store:
   sqlite: { path: data/intakepilot.db }

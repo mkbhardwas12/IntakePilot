@@ -59,10 +59,12 @@ def load_slot_schema(path: Path | None = None) -> SlotSchema:
 @dataclass
 class Config:
     llm_provider: str = "mock"
+    llm_escalation_provider: str = ""   # optional stronger model for hard turns
     store_provider: str = "sqlite"
     vector_provider: str = "local"
     connector_provider: str = "fixture"
     llm: dict = field(default_factory=dict)
+    llm_escalation: dict = field(default_factory=dict)
     store: dict = field(default_factory=dict)
     vector: dict = field(default_factory=dict)
     connectors: dict = field(default_factory=dict)
@@ -84,11 +86,15 @@ def load_config(path: Path | None = None) -> Config:
     provider = raw.get("provider", {})
     cfg = Config(
         llm_provider=os.environ.get("INTAKEPILOT_LLM", provider.get("llm", "mock")),
+        # `or ""`: compose files pass empty strings for unset env vars.
+        llm_escalation_provider=(os.environ.get("INTAKEPILOT_LLM_ESCALATION")
+                                 or provider.get("llm_escalation", "") or ""),
         store_provider=os.environ.get("INTAKEPILOT_STORE", provider.get("store", "sqlite")),
         vector_provider=os.environ.get("INTAKEPILOT_VECTOR", provider.get("vector", "local")),
         connector_provider=os.environ.get("INTAKEPILOT_CONNECTOR",
                                           provider.get("connector", "fixture")),
         llm=raw.get("llm", {}),
+        llm_escalation=raw.get("llm_escalation", {}) or {},
         store=raw.get("store", {}),
         vector=raw.get("vector", {}),
         connectors=raw.get("connectors", {}),

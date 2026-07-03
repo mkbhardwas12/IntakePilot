@@ -52,6 +52,13 @@ vars: `INTAKEPILOT_LLM=mock|ollama|openai_compat`,
 Any OpenAI-compatible endpoint works via `OPENAI_BASE_URL`/`OPENAI_MODEL`.
 Setting `DATABASE_URL` switches the store to Postgres automatically.
 
+**Hybrid model strategy:** set `INTAKEPILOT_LLM_ESCALATION` to give the
+intake a second, stronger model (cloud frontier or bigger internal) that
+answers only when the primary fails structured-output validation twice —
+local-first economics with frontier-grade interpretation on the hard turns.
+Escalations taper off as the learning ledger accumulates exemplars from
+daily usage. Embeddings always stay on the primary.
+
 ## Demo via curl (no UI needed)
 
 ```bash
@@ -131,7 +138,9 @@ green for success, and a distinct badge color per provenance value.
 Implemented and verified (spec milestones 1–5 core, plus gates/routing from 6):
 
 - Pydantic model per spec 4.1; slot schema loader with the `askable:false` rule (4.2)
-- Providers: mock (deterministic, offline), Ollama, OpenAI-compatible; SQLite
+- Providers: mock (deterministic, offline), Ollama, OpenAI-compatible, plus
+  an optional escalation tier (`EscalatingLLM`: a stronger model answers
+  validation-failed turns — the hybrid local/cloud strategy); SQLite
   (default) and Postgres (4.3 DDL) stores, both append-only; local cosine
   vector index and pgvector
 - The full 6.1 turn loop with SSE streaming, budget enforcement, gap ladder,
