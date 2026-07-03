@@ -4,25 +4,52 @@
 
 *(Cover image: `docs/assets/workflow.png` — upload from the repo)*
 
-Every failed IT project I've seen started the same way: someone asked for something in plain words, and by the time it reached the people who build, it meant something else entirely. The business user writes a two-line ticket, because that's all the form asks for. The business analyst — juggling ten other requests — books calls, chases context, and still ends up reconstructing intent from fragments; through no fault of their own, the real ask quietly slips out of focus. The developer builds what they *think* was meant. Three weeks later everyone discovers it's the wrong thing — and the one person who knew that on day one was never in the loop. The two things everybody actually wanted, speed and accuracy, are the first two casualties.
+No invented war story — I'll just show you the thing I built doing its job. Every number and quote below comes from a real run of the shipped demo, which you can reproduce in five minutes with `make dev`: no model download, no cloud account, no signup. The problem it attacks is easy to state, because we've all lived it: between the person who needs something and the person who builds it sit a two-line ticket form, a busy business analyst reconstructing intent from fragments through no fault of their own, and a developer building a best guess. The two things everybody actually wanted — speed and accuracy — are the first casualties. IntakePilot exists to protect exactly those two.
 
 In 2026 there's a new twist. AI coding agents can now take a Jira ticket and open a pull request — Atlassian is shipping [agents in Jira](https://community.atlassian.com/forums/Jira-articles/Introducing-Agents-in-Jira/ba-p/3194583), GitHub connects [Copilot's coding agent straight to Jira](https://devops.com/github-copilot-coding-agent-for-jira-connects-planning-to-pull-requests-without-leaving-your-workflow/). But everyone deploying these tools is learning the same lesson: [the quality ceiling for AI-generated code is set by the ticket that triggered it](https://www.augmentcode.com/guides/jira-ticket-to-pull-request-automation). A two-sentence ticket produces a best-guess implementation. The bottleneck has moved upstream — to intake.
 
 So I built **IntakePilot**: an open, self-hosted platform that turns a plain-language business ask into a structured, quality-gated, correctly-routed requirement — and *you* decide, per deployment, whether a single token ever leaves your network.
 
-## The workflow, end to end
+## The real demo, minute by minute
 
-A business user types what they'd say out loud: *"our monthly vendor report takes 3 days to compile by hand."* No forms, no jargon. From there:
+The requester in the shipped scenario is a Finance Ops analyst. She types one sentence — what she'd say out loud, not what a form wants:
 
-**The system drafts before it asks.** A live "Shadow Draft" fills in structured slots — outcome, urgency, success criteria, affected systems — each tagged with its provenance (extracted, inferred, retrieved, assumed) and a confidence bar. Gaps are resolved by inference from who's asking and by retrieval from the org's glossary and past requirements *before* a single question is asked. When it must ask, it's capped: three questions per turn, seven total, enforced in code — not in a prompt an LLM might ignore. This is the "extra layer of thinking" a requester gets for free: the system shows them what a complete requirement looks like, and what was assumed on their behalf, before they commit.
+> our monthly vendor report takes 3 days to compile by hand
 
-**Business users never get technical questions.** Slots like "affected systems" are marked unaskable in the schema. After confirmation, an enrichment step resolves the business terms against a system-knowledge connector — the demo ships with an SAP S/4HANA fixture, so "order info" becomes `VBAK/VBAP`, including custom Z-fields like `ZZ_PRIORITY_CODE`, with owners. The assigned team sees backend context the requester was never bothered about.
+**Before asking her anything**, the Shadow Draft panel fills in live, every slot tagged with where it came from and how sure the system is. From the actual run: *business outcome* — **extracted** from her sentence (confidence 0.85). *Stakeholders* — **inferred** (0.55) from nothing more than her department. *Affected systems* — **retrieved** from the org glossary, which already knows "vendor report" means `ERP-VendorMaster` and `BI-Reporting`. *Data sensitivity* — **assumed**: `internal`, tagged *"org norm; override at confirm."* Readiness score: 34.
 
-**Humans stay in charge at the right moments.** The requester confirms the draft. A business analyst can sit in the loop — or not; smaller orgs skip straight to a functional reviewer who corrects and approves. Every correction is captured as a diff. Then five quality gates run (schema completeness, INVEST, an ambiguity lint that demands measurable anchors, conflict, routing sanity), and a classifier routes the requirement to the right team queue *with a written explanation* — no black-box routing.
+Only now does it ask — two questions (urgency, success criteria), each with a one-line *because*, answerable as chips. The budget meter reads 2 of 7 spent. That cap is a Python constant enforced in the orchestrator, not a prompt suggestion an LLM might ignore — there is a test where a deliberately malicious model tries to ask more and can't. This is the extra layer of thinking a requester gets for free: she sees what a *complete* requirement looks like, and what was assumed on her behalf, before committing to any of it.
 
-**The ticket lands where work happens.** The routed ticket goes to your project tool — Jira, Azure DevOps, GitHub — carrying **two artifacts: the structured business requirement and a generated implementation scaffold.** That's exactly the enriched input AI coding agents need to produce something close to production-ready on the first pass. The developer reviews, adjusts, ships. Requester, analyst, reviewer, and developer are all looking at the same requirement, each rendered in their own language. Same visibility, no translation loss, dramatically less waiting.
+Two chip taps later, readiness hits 83 and Confirm unlocks. Reviewing the draft, she spots that the glossary missed a system and edits *affected systems* to add it. That edit is the single most valuable byte in the product — more on it below. Then five quality gates run (schema completeness, INVEST, an ambiguity lint that demands measurable anchors, conflict, routing sanity), and the router assigns a queue **with its reasoning in writing**. From the run, verbatim: *Matched 1 signal(s) for "data-platform": "report".* No black-box routing.
 
-**And it improves itself.** Every human edit at confirmation becomes a training exemplar injected into future extraction prompts. This is model-agnostic learning: swap the LLM tomorrow and the accumulated corrections still work, because the learning lives in a ledger, not in fine-tuned weights. Usage is the flywheel.
+What lands in the repo is a ticket a developer can actually work from — this is the top of the real file, `IPR-2026-000001.md`:
+
+```markdown
+# Automate the monthly vendor report — currently 3 days to compile by hand
+
+- Requirement: IPR-2026-000001 v6 · Requester: Demo (Finance Ops)
+- Readiness at confirmation: 83
+
+## Slots
+- Business outcome  (extracted, 0.85): Automate the monthly vendor report …
+- Affected systems  (edited,    1.00): ERP-VendorMaster, BI-Reporting, NewSys
+- Urgency           (answered,  0.95): this week
+- Data sensitivity  (assumed,   0.50): internal
+
+## Original ask (verbatim)
+> our monthly vendor report takes 3 days to compile by hand
+
+## Assumptions
+- data_sensitivity = internal — org norm; override at confirm
+```
+
+Every claim carries its provenance and confidence; her original words survive verbatim; every assumption is declared instead of buried. Requester, analyst, reviewer, and developer are looking at the same requirement, each in language they can act on.
+
+**Business users never get technical questions — the system finds the backend itself.** Slots like *affected systems* are marked `askable: false` in the schema (an invariant test enforces that the question composer can never ask them). After confirmation, an enrichment step resolves the business terms against a system-knowledge connector. Try the demo's second scenario — *"I need a report of goods details for product line X with the order info"* — and the routed ticket gains a **System context (auto-discovered)** section: sales orders are `VBAK/VBAP` in the demo SAP S/4HANA system, materials are `MARA`, and there's a custom Z-field, `ZZ_PRIORITY_CODE`, with a type, description, and owning team. Nobody asked the requester a single technical question to get there.
+
+**And that edit she made?** It became an `edit_diffs` row the moment she confirmed — proposed value, corrected value, context. The next intake from a similar context gets her correction injected into its extraction prompt as an exemplar, and the discovered systems land in a knowledge ledger that pre-fills future drafts. A business analyst can sit in the loop where the org wants one — or not; smaller teams go straight to a functional reviewer. Either way the learning compounds: this is model-agnostic improvement that lives in ledgers, not fine-tuned weights, so you can swap the model tomorrow and keep every lesson. Usage is the flywheel.
+
+**Where the ticket goes next.** Today the shipped target writes tickets to a local repo (GitHub issue code exists but isn't wired yet); Jira and Azure DevOps are a one-class integration via the same `create_item` protocol, and the roadmap's Builder Agent will attach a second artifact next to the business requirement — a generated implementation scaffold — so an AI coding agent gets exactly the enriched input it needs and a developer reviews two attachments instead of decoding one vague ticket. That's the full chain: same visibility for everyone, dramatically less waiting.
 
 ## "But is a local model smart enough?" — the hybrid answer
 
