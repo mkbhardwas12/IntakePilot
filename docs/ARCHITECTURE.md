@@ -16,12 +16,12 @@ The loop closes through the learning ledger: every human correction at confirmat
 
 ```mermaid
 flowchart LR
-    BU[Business user\nplain-language ask] --> IP[IntakePilot intake\nShadow Draft, ≤7 questions,\nhuman confirm]
-    IP --> FR[Functional / BA review\ncorrections captured as edit diffs]
-    FR --> G[5 quality gates + routing\nwith written explanation]
-    G --> PM[PM tool - Jira / ADO\nticket + business requirement\n+ code scaffold]
-    PM --> DEV[AI dev tool + developer\nagent implements, human reviews]
-    DEV -. every correction improves\nthe next intake .-> IP
+    BU["Business user<br/>plain-language ask"] --> IP["IntakePilot intake<br/>Shadow Draft, max 7 questions,<br/>human confirm"]
+    IP --> FR["Functional / BA review<br/>corrections captured as edit diffs"]
+    FR --> G["5 quality gates + routing<br/>with written explanation"]
+    G --> PM["PM tool - Jira / ADO<br/>ticket + business requirement<br/>+ code scaffold"]
+    PM --> DEV["AI dev tool + developer<br/>agent implements, human reviews"]
+    DEV -. "every correction improves<br/>the next intake" .-> IP
 ```
 
 ## Core design decisions
