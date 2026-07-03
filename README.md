@@ -77,8 +77,8 @@ human edit as an `edit_diffs` row (the learning asset) which
 `core/learning/exemplars.py` injects into future extraction prompts —
 model-agnostic learning. Gates 1/3 are deterministic pure functions; gates
 2/4/5 use the LLM as a scored rubric behind one validate-and-retry wrapper.
-The routing classifier is keyword/embedding-based with a confidence and a
-human-readable explanation. `web/` is a React + TypeScript + Vite app that
+The routing classifier is keyword-based with a confidence and a
+human-readable explanation (embedding-assisted scoring is on the roadmap). `web/` is a React + TypeScript + Vite app that
 consumes the SSE turn stream to animate the Shadow Draft live.
 
 ## Backend-aware enrichment and the system knowledge base
@@ -140,7 +140,8 @@ Implemented and verified (spec milestones 1–5 core, plus gates/routing from 6)
 - Confirmation with edit-diff capture, exemplar selection/injection (7.2)
 - Five-gate pipeline (1 & 3 deterministic; 2/4/5 LLM-rubric), routing
   classifier with explanation, local ticket target writing to
-  `examples/demo-repo/`, GitHub target (issue creation; webhooks stubbed)
+  `examples/demo-repo/` (a GitHub target exists in code but is not yet
+  wired into config — see PROJECT-REVIEW.md)
 - `/api/metrics` computing Section 9 metrics from the ledgers (plus
   system-KB counts)
 - ADDENDUM-01 backend-aware enrichment: `SystemConnector` protocol + fixture
