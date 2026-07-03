@@ -12,6 +12,7 @@ IntakePilot is provider-agnostic by design: the same codebase runs on a laptop w
 | Air-gapped | Ollama with pre-loaded model | Postgres/pgvector | prod compose, images + model transferred offline |
 | Cloud VM (EC2 / Azure VM / GCE / Hetzner…) | any | Postgres/pgvector | same prod compose on the VM |
 | Managed cloud services | Azure OpenAI / Bedrock gateway / hosted vLLM via `openai_compat` | managed Postgres (`DATABASE_URL`) | api + web containers on ECS/App Service/Cloud Run |
+| **Hybrid (recommended)** | local primary + stronger escalation model for hard turns | any of the above | set `INTAKEPILOT_LLM_ESCALATION` |
 
 ## 1. Local development
 
@@ -52,6 +53,17 @@ OPENAI_API_KEY=            # if your gateway requires one
 
 **Managed Postgres.** Remove the `db` service and set `DATABASE_URL=postgresql://user:pass@host:5432/db` on the api service (setting `DATABASE_URL` switches the store to Postgres automatically; keep `INTAKEPILOT_VECTOR=pgvector` and enable the pgvector extension on the instance).
 
+**Hybrid model strategy — local primary, stronger escalation.** A local open-weight model is not always enough to interpret unfamiliar business language on day one. Instead of forcing a choice, configure two tiers: the primary answers every turn, and a stronger model (a cloud frontier endpoint where policy allows it, or a bigger internal model) gets exactly one attempt when the primary's structured output fails validation twice. Embeddings always stay on the primary, so the vector index remains consistent. As daily usage fills the learning ledger with correction exemplars, the primary succeeds more often and escalations — the expensive tokens — taper toward zero:
+
+```
+INTAKEPILOT_LLM=ollama                     # primary: local
+INTAKEPILOT_LLM_ESCALATION=openai_compat   # hard turns only
+OPENAI_BASE_URL=https://your-approved-endpoint/v1
+OPENAI_MODEL=your-strong-model
+```
+
+For a bigger *local* model as the escalation tier instead, set `llm_escalation:` in `intakepilot.yaml` (e.g. same Ollama host, `model: llama3.1:70b`) — fully air-gapped hybrid.
+
 ## 4. Air-gapped
 
 On a connected machine: `docker compose -f docker-compose.prod.yml --profile local-llm build`, then `docker save` the api/web images plus `pgvector/pgvector:pg16` and `ollama/ollama`, and pull the model once so the `ollama` named volume contains it (or download a GGUF and `ollama create` inside the network). Transfer the image tarballs and the Ollama model directory, `docker load` on the target, and run the same compose file. No step of the pipeline calls out: extraction, gates, routing, learning, and enrichment all run against your local model and database.
@@ -67,6 +79,7 @@ Everything is selectable in `intakepilot.yaml` and overridable by environment:
 | Variable | Values | Notes |
 |---|---|---|
 | `INTAKEPILOT_LLM` | `mock` \| `ollama` \| `openai_compat` | mock is deterministic/offline |
+| `INTAKEPILOT_LLM_ESCALATION` | same values, optional | stronger model for validation-failed turns |
 | `INTAKEPILOT_STORE` | `sqlite` \| `postgres` | `DATABASE_URL` implies postgres |
 | `INTAKEPILOT_VECTOR` | `local` \| `pgvector` | |
 | `INTAKEPILOT_CONNECTOR` | `fixture` \| your own | ADDENDUM-01 system connector |

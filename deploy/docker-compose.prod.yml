@@ -42,6 +42,9 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-intakepilot}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}@db:5432/${POSTGRES_DB:-intakepilot}
       INTAKEPILOT_LLM: ${INTAKEPILOT_LLM:-ollama}
+      # Hybrid model strategy: optional stronger model that answers only when
+      # the primary fails structured-output validation twice.
+      INTAKEPILOT_LLM_ESCALATION: ${INTAKEPILOT_LLM_ESCALATION:-}
       INTAKEPILOT_VECTOR: ${INTAKEPILOT_VECTOR:-pgvector}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}

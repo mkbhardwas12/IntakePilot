@@ -8,9 +8,7 @@ from __future__ import annotations
 from core.config import Config
 
 
-def make_llm(cfg: Config):
-    name = cfg.llm_provider
-    conf = cfg.llm.get(name, {})
+def _make_llm_single(name: str, conf: dict):
     if name == "mock":
         from core.providers.llm.mock import MockLLM
         return MockLLM(conf)
@@ -21,6 +19,18 @@ def make_llm(cfg: Config):
         from core.providers.llm.openai_compat import OpenAICompatLLM
         return OpenAICompatLLM(conf)
     raise ValueError(f"unknown llm provider: {name}")
+
+
+def make_llm(cfg: Config):
+    primary = _make_llm_single(cfg.llm_provider, cfg.llm.get(cfg.llm_provider, {}))
+    esc_name = cfg.llm_escalation_provider
+    if esc_name:
+        from core.providers.llm.base import EscalatingLLM
+        # `llm_escalation:` section overrides (e.g. a bigger model on the same
+        # provider); falls back to the provider's own `llm:` entry.
+        esc_conf = cfg.llm_escalation or cfg.llm.get(esc_name, {})
+        return EscalatingLLM(primary, _make_llm_single(esc_name, esc_conf))
+    return primary
 
 
 def make_store(cfg: Config):

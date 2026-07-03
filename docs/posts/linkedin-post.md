@@ -18,7 +18,7 @@ Two design choices I refuse to compromise on:
 
 1. The LLM is a component, never in control. Deterministic code owns budgets, merges, gates, routing — and adversarial tests prove it.
 
-2. It runs entirely on YOUR infrastructure. Your processes are core IP; they don't belong in someone else's API logs. Swap one env var: local Ollama, vLLM, any OpenAI-compatible endpoint. Laptop, air-gapped data center, or any cloud. Open-weight models are already good enough for structured intake — and they're only getting better while per-token enterprise AI pricing isn't.
+2. Your model, your choice — including hybrid. "Is a local LLM smart enough to understand the business?" On day one, maybe not — so a stronger model (cloud frontier or a bigger internal one) answers ONLY the hard turns where the local model's output fails validation. Every human correction becomes a training exemplar on your side of the firewall, so the local model gets smarter on YOUR business with daily use and expensive escalations taper toward zero. Your processes are core IP — nothing has to leave your network unless you choose. Laptop, air-gapped data center, or any cloud.
 
 And it learns: every human correction becomes an exemplar that improves the next intake. Model-agnostic, because the learning lives in data, not weights.
 
