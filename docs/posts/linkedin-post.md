@@ -1,12 +1,12 @@
 # LinkedIn Post
 
-*(Attach `docs/assets/workflow-social.png` FIRST — the mobile-friendly version — and `docs/assets/architecture.png` second. The detailed engineering sheet `workflow.png` stays in the repo/Medium. Paste the text below as-is; it is ~2,997 characters, under LinkedIn's 3,000 limit. Add the GitHub + Medium links before posting.)*
+*(Attach `docs/assets/workflow-social.png` FIRST — the mobile-friendly version — and `docs/assets/architecture.png` second. The detailed engineering sheet `workflow.png` stays in the repo/Medium. Paste the text below as-is; it is ~3,007 characters, under LinkedIn's 3,000 limit. Add the GitHub + Medium links before posting.)*
 
 ---
 
-After many years in enterprise IT, most of them around SAP, one complaint has followed me everywhere. Colleagues, friends at other companies, people at user groups. Different places, same sentence: "We don't really know what the business wants."
+After many years in enterprise IT, most of them around SAP, one complaint has followed me everywhere. Colleagues, friends at other companies, people at user groups, same sentence: "Getting a clear BRD is hard when no one is aligned yet on what should change, where, and how."
 
-The story behind it is always the same. Business asks for something. The functional side understands it one way, the developer reads it another way, and everyone discovers the difference much later, when fixing it is expensive. Nobody did anything wrong. The ask just changed shape every time it changed hands.
+The story behind it is always the same. Business asks for something. The functional side understands it one way, the developer reads it another way, and everyone discovers the difference late, when fixing it is expensive. Nobody did anything wrong. The ask just changed shape every time it changed hands.
 
 I heard it often enough that I stopped nodding and started building, in my own time. The community has helped me grow everywhere I have been, mostly through people who never knew they were helping. So this is a give-back: IntakePilot, open source. Use it as it is, or adapt the basics to your setup.
 
@@ -24,7 +24,7 @@ Business users are never asked about SAP tables or backend columns. Enrichment r
 
 The learning lives in ledgers, not model weights: corrections become prompt exemplars, reroutes teach the router, repeated edits become glossary proposals, and replaying old corrections shows whether accuracy is improving.
 
-And it sees the portfolio, not just one ticket. Two different asks touching the same SAP table meet at intake instead of at the merge conflict. Every ticket prices its own pain ("3 days, monthly, by hand" becomes 288 hours a year of doing nothing). Routed work carries generated acceptance criteria. Named stakeholders countersign before the build starts.
+And it sees the portfolio, not just one ticket. Two different asks touching the same SAP table meet at intake, not at the merge conflict. Every ticket prices its own pain ("3 days, monthly, by hand" becomes 288 hours a year of doing nothing). Routed work carries generated acceptance criteria. Named stakeholders countersign before the build starts.
 
 The rule underneath: the LLM proposes, deterministic code decides.
 
@@ -37,4 +37,4 @@ Longer write-up: [Medium link]
 
 If something doesn't fit your intake process, tell me. I'd rather improve it against real needs than my own guesses.
 
-#EnterpriseAI #SAP #S4HANA #LocalLLM #OpenSource
+#EnterpriseAI #SAP #LocalLLM #OpenSource

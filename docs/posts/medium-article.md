@@ -4,7 +4,7 @@
 
 *(Cover image: `docs/assets/cover.png` — the 2:1 thumbnail. Place `docs/assets/workflow.png` after "The demo, minute by minute" heading, and `docs/assets/architecture.png` where the diagram note appears below.)*
 
-I've spent a good number of years in enterprise IT, most of it around SAP. In all that time, one complaint has followed me everywhere. I've heard it from colleagues, from friends at other companies, from people I meet at user groups and trainings. Different places, different industries, and it's always some version of the same sentence: "We don't really know what the business wants."
+I've spent a good number of years in enterprise IT, most of it around SAP. In all that time, one complaint has followed me everywhere. I've heard it from colleagues, from friends at other companies, from people I meet at user groups and trainings. Different places, different industries, and it's always some version of the same sentence: "Getting a clear BRD is the hardest part, because the people involved are rarely aligned yet on what needs to change, where, and how."
 
 And when you listen closely, the story underneath is always the same too. The business asks for something. The functional side understands it one way. By the time a developer picks it up, it has quietly become a third thing. Everyone finds out only when they finally sit at the same table, usually late, usually after something was already built. Nobody in that chain did anything wrong. The ask simply changed shape every time it changed hands, because there was no one place where all of them could look at the same requirement.
 
