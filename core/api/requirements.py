@@ -142,6 +142,65 @@ async def attach(req_id: str, body: AttachBody, request: Request):
                 "attached_to": body.target_req_id}
 
 
+class ConsentBody(BaseModel):
+    stakeholder: str
+    decision: str  # approve | object
+    note: str | None = None
+
+
+def _consent_status(rows: list[dict]) -> list[dict]:
+    """Latest verdict per stakeholder (rows are insertion-ordered)."""
+    latest: dict[str, dict] = {}
+    for row in rows:
+        detail = row.get("detail") or {}
+        name = detail.get("stakeholder")
+        if name:
+            latest[name] = {"stakeholder": name, "status": row.get("verdict"),
+                            "note": detail.get("note")}
+    return list(latest.values())
+
+
+@router.get("/{req_id}/consent", dependencies=[Depends(require_admin)])
+async def consent_status(req_id: str, request: Request):
+    """The countersign ledger: who was named, who approved, who objected."""
+    ctx = _ctx(request)
+    await _latest(ctx, req_id)  # 404 for unknown requirements
+    rows = await ctx.store.query_ledger("outcome_ledger", req_id=req_id,
+                                        stage="consent")
+    entries = _consent_status(rows)
+    return {"req_id": req_id, "stakeholders": entries,
+            "objections": sum(1 for e in entries if e["status"] == "objected"),
+            "pending": sum(1 for e in entries if e["status"] == "pending")}
+
+
+@router.post("/{req_id}/consent", dependencies=[Depends(require_admin)])
+async def countersign(req_id: str, body: ConsentBody, request: Request):
+    """A named stakeholder approves or objects. Objections don't roll back
+    routing in v0.1 — they land on the audit trail and the ledger, where the
+    assigned team sees them before building."""
+    decision = body.decision.strip().lower()
+    if decision not in ("approve", "object"):
+        raise HTTPException(422, "decision must be 'approve' or 'object'")
+    ctx = _ctx(request)
+    async with ctx.orchestrator.lock_for(req_id):
+        obj = await _latest(ctx, req_id)
+        rows = await ctx.store.query_ledger("outcome_ledger", req_id=req_id,
+                                            stage="consent")
+        named = {(r.get("detail") or {}).get("stakeholder") for r in rows}
+        if body.stakeholder not in named:
+            raise HTTPException(404, "stakeholder was not named on this requirement")
+        verdict = "approved" if decision == "approve" else "objected"
+        await ctx.store.log("outcome_ledger", {
+            "req_id": req_id, "stage": "consent", "verdict": verdict,
+            "detail": {"stakeholder": body.stakeholder,
+                       "note": (body.note or "")[:300]}})
+        obj.version += 1
+        obj.touch(f"consent_{verdict}",
+                  f"{body.stakeholder}" + (f": {body.note[:120]}" if body.note else ""))
+        await ctx.store.put_version(obj)
+    return {"req_id": req_id, "stakeholder": body.stakeholder, "status": verdict}
+
+
 class ConfirmBody(BaseModel):
     edits: dict = {}
     confirmed_by: str | None = None
@@ -193,6 +252,23 @@ async def _confirm_locked(ctx, req_id: str, body: ConfirmBody):
         confirmed_by=body.confirmed_by or obj.requester.name, edits=edit_count)
     obj.status = Status.CONFIRMED
     obj.touch("confirmed", f"{edit_count} edit(s) at confirmation")
+
+    # I4: nemawashi, digitized — every named stakeholder gets a countersign
+    # record. Non-blocking in v0.1 (routing proceeds), but objections are on
+    # the record BEFORE the work starts, not discovered at UAT.
+    stakeholders_slot = obj.slots.get("stakeholders")
+    consent_pending: list[str] = []
+    if stakeholders_slot and isinstance(stakeholders_slot.value, list):
+        for name in stakeholders_slot.value:
+            name = str(name).strip()
+            if not name:
+                continue
+            consent_pending.append(name)
+            await ctx.store.log("outcome_ledger", {
+                "req_id": req_id, "stage": "consent", "verdict": "pending",
+                "detail": {"stakeholder": name}})
+        if consent_pending:
+            obj.touch("consent_requested", ", ".join(consent_pending))
     # Denominator for readiness calibration (edit rate per provenance needs
     # to know how many confirmations happened in this bucket).
     await ctx.store.log("outcome_ledger", {
@@ -265,4 +341,5 @@ async def _confirm_locked(ctx, req_id: str, body: ConfirmBody):
             "routing": decision.model_dump(),
             "collisions": collision_hits,
             "acceptance": acceptance_scenarios,
+            "consent": {"pending": consent_pending},
             "ticket": ticket.model_dump() if ticket else None}
