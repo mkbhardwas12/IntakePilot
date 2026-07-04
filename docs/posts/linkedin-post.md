@@ -1,6 +1,6 @@
 # LinkedIn Post
 
-*(Attach `docs/assets/workflow-social.png` FIRST — the mobile-friendly version — and `docs/assets/architecture.png` second. The detailed engineering sheet `workflow.png` stays in the repo/Medium. Paste the text below as-is; it is ~2,500 characters, under LinkedIn's 3,000 limit. Add the GitHub + Medium links before posting.)*
+*(Attach `docs/assets/workflow-social.png` FIRST — the mobile-friendly version — and `docs/assets/architecture.png` second. The detailed engineering sheet `workflow.png` stays in the repo/Medium. Paste the text below as-is; it is ~2,850 characters, under LinkedIn's 3,000 limit. Add the GitHub + Medium links before posting.)*
 
 ---
 
@@ -32,6 +32,8 @@ The learning lives in ledgers, not model weights:
 - duplicates get attached, not rebuilt
 - repeated edits become glossary proposals
 - correction replay shows whether accuracy is actually improving
+
+And it sees the portfolio, not just one ticket. Two different asks touching the same SAP table meet at intake instead of at the merge conflict. Every ticket prices its own pain: "3 days, monthly, by hand" becomes 288 hours a year of doing nothing, computed from the requester's own words. Routed work carries generated acceptance criteria a coding agent can verify against. Named stakeholders countersign before the build starts, not after UAT fails.
 
 The design rule underneath: the LLM proposes, deterministic code decides.
 
