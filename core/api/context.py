@@ -53,6 +53,14 @@ class AppContext:
                                          self.schema, self.cfg)
         self.target = LocalTarget(self.cfg.demo_repo)
         self.connectors = make_connectors(self.cfg)  # ADDENDUM-01
+        # Durable escalation observability: every fall-through to the strong
+        # model leaves an outcome_ledger row (in-memory stats reset on restart).
+        if hasattr(self.llm, "escalation"):
+            async def _log_escalation(detail: str) -> None:
+                await self.store.log("outcome_ledger", {
+                    "req_id": "", "stage": "escalation", "verdict": "invoked",
+                    "detail": {"failure": detail[:300]}})
+            self.llm.on_escalation = _log_escalation
 
     async def seed_glossary(self) -> None:
         """Insert seed terms that are not present yet; never touch rows the

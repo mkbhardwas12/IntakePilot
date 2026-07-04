@@ -9,6 +9,19 @@ from fastapi import APIRouter, Request
 router = APIRouter(prefix="/api", tags=["metrics"])
 
 
+def _escalation_metrics(ctx, outcome_rows: list[dict]) -> dict:
+    events = sum(1 for r in outcome_rows if r["stage"] == "escalation")
+    stats = getattr(ctx.llm, "stats", None)
+    rate = (round(stats["escalations"] / stats["validated_calls"], 3)
+            if stats and stats["validated_calls"] else None)
+    return {
+        "enabled": stats is not None,
+        "events": events,                      # durable (outcome_ledger)
+        "rate_since_start": rate,              # escalations / validated calls
+        "rescues_since_start": stats["rescues"] if stats else None,
+    }
+
+
 def _parse(ts: str) -> datetime | None:
     try:
         return datetime.fromisoformat(ts.replace("Z", "+00:00"))
@@ -86,6 +99,10 @@ async def metrics(request: Request):
         "analyst_hours_displaced": round(
             confirmed * ctx.cfg.analyst_baseline_hours, 1),
         "assumption_rate": round(assumed / filled, 3) if filled else None,
+        # Hybrid model strategy: how often the primary model needed the
+        # stronger tier. The pitch says this tapers as exemplars accumulate —
+        # this is where that claim becomes measurable.
+        "escalation": _escalation_metrics(ctx, outcome_rows),
         # ADDENDUM-01: the backend knowledge base grows with every discovery.
         "system_kb": {
             "entities": len(kb_rows),
