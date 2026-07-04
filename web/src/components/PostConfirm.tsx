@@ -130,6 +130,26 @@ export function PostConfirm({ result, sessionId, onRestart }:
         </div>
       )}
 
+      {allLit && (result.collisions?.length ?? 0) > 0 && (
+        <div className="gate-failures fade-in">
+          <div className="gate-failure">
+            <span className="gate-failure-title">
+              Open work on the same entities
+            </span>
+            {result.collisions!.map((c) => (
+              <span key={c.req_id} className="gate-failure-reason">
+                {c.req_id} ({c.status}
+                {c.queue ? `, ${c.queue}` : ""}) — shares:{" "}
+                {c.shared.map((s) => s.replace(/^system:/, "")).join(", ")}
+              </span>
+            ))}
+            <span className="gate-failure-suggestion">
+              Not a duplicate — both can proceed, but these teams should talk first.
+            </span>
+          </div>
+        </div>
+      )}
+
       {allLit && backendContext && (
         <div className="post-syscontext fade-in">
           <SystemContextCard context={backendContext} source={result.draft.slots["backend_context"]?.source} />

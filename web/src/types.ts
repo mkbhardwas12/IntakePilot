@@ -29,4 +29,8 @@ export interface GateResult {
   meta?: Record<string, unknown>;
 }
 export interface Ticket { target: string; ref: string; path: string; title: string; }
-export interface ConfirmResponse { draft: RequirementObject; gates: GateResult[]; routing: RoutingDecision; ticket: Ticket | null; }
+export interface Collision { req_id: string; status: string; queue: string | null; shared: string[]; }
+export interface ConfirmResponse {
+  draft: RequirementObject; gates: GateResult[]; routing: RoutingDecision;
+  collisions?: Collision[]; ticket: Ticket | null;
+}
