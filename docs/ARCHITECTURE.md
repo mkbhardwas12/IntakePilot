@@ -46,4 +46,4 @@ flowchart LR
 
 ## Trust boundaries and current limits
 
-The API currently ships **without authentication** — front it with your SSO/reverse proxy or keep it on an internal network (`docs/DEPLOYMENT.md`, security checklist). Multi-tenancy, Jira webhook status sync, the full 40-scenario eval harness, and the Builder Agent (the component that will attach generated code scaffolds to tickets automatically) are specified in the build spec's later milestones; `PROJECT-REVIEW.md` tracks the honest gap list.
+There is **no end-user SSO yet** — requirements are bound to their creating session (`X-Session-Id`, anti-enumeration 404s), one bearer token (`INTAKEPILOT_ADMIN_TOKEN`) closes every admin/ops surface, and the GitHub webhook verifies `X-Hub-Signature-256` — but user identity remains your reverse proxy's job (`docs/DEPLOYMENT.md`, security checklist). Multi-tenancy, the Jira/ADO target, the full 40-scenario eval harness, and the Builder Agent (the component that will attach generated code scaffolds to tickets automatically) are specified in the build spec's later milestones; `PROJECT-REVIEW.md` tracks the honest gap list.
