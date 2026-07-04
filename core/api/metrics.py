@@ -9,6 +9,14 @@ from fastapi import APIRouter, Request
 router = APIRouter(prefix="/api", tags=["metrics"])
 
 
+def _routing_accuracy(routed_ids: set, outcome_rows: list[dict]) -> float | None:
+    if not routed_ids:
+        return None
+    rerouted = {r["req_id"] for r in outcome_rows if r["stage"] == "reroute"}
+    return round((len(routed_ids) - len(rerouted & routed_ids))
+                 / len(routed_ids), 3)
+
+
 def _escalation_metrics(ctx, outcome_rows: list[dict]) -> dict:
     events = sum(1 for r in outcome_rows if r["stage"] == "escalation")
     stats = getattr(ctx.llm, "stats", None)
@@ -93,8 +101,9 @@ async def metrics(request: Request):
         "questions_per_intake_avg": (round(questions_asked / confirmed, 2)
                                      if confirmed else None),
         "edit_rate_per_field": edit_rate_per_field,
-        # Needs post-routing re-route signal (Milestone 6 webhook sync):
-        "routing_accuracy": None,
+        # Ground truth from the ticket tool: reroutes (manual endpoint or
+        # GitHub webhook) mean the classifier picked the wrong queue.
+        "routing_accuracy": _routing_accuracy(routed_ids, outcome_rows),
         "duplicate_catch_rate": duplicate_catch_rate,
         "analyst_hours_displaced": round(
             confirmed * ctx.cfg.analyst_baseline_hours, 1),

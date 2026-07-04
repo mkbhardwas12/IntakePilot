@@ -50,6 +50,8 @@ services:
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      INTAKEPILOT_TARGET: ${INTAKEPILOT_TARGET:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
     depends_on:
       db: { condition: service_healthy }
     volumes:

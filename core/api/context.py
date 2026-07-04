@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from core.config import Config, SlotSchema, load_config, load_slot_schema
 from core.providers import make_connectors, make_llm, make_store, make_vector
 from core.agents.orchestrator import Orchestrator
-from core.targets.local import LocalTarget
+from core.targets import make_target
 
 # Cold-start glossary seed (spec 7.5): a one-time importer CLI is the real
 # mechanism; these rows make the offline demo's RETRIEVE/INFER passes work.
@@ -51,7 +51,7 @@ class AppContext:
         self.vector = make_vector(self.cfg, self.llm)
         self.orchestrator = Orchestrator(self.llm, self.store, self.vector,
                                          self.schema, self.cfg)
-        self.target = LocalTarget(self.cfg.demo_repo)
+        self.target = make_target(self.cfg)
         self.connectors = make_connectors(self.cfg)  # ADDENDUM-01
         # Durable escalation observability: every fall-through to the strong
         # model leaves an outcome_ledger row (in-memory stats reset on restart).

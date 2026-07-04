@@ -63,8 +63,10 @@ class Config:
     store_provider: str = "sqlite"
     vector_provider: str = "local"
     connector_provider: str = "fixture"
+    target_provider: str = "local"
     llm: dict = field(default_factory=dict)
     llm_escalation: dict = field(default_factory=dict)
+    targets: dict = field(default_factory=dict)
     store: dict = field(default_factory=dict)
     vector: dict = field(default_factory=dict)
     connectors: dict = field(default_factory=dict)
@@ -93,8 +95,11 @@ def load_config(path: Path | None = None) -> Config:
         vector_provider=os.environ.get("INTAKEPILOT_VECTOR", provider.get("vector", "local")),
         connector_provider=os.environ.get("INTAKEPILOT_CONNECTOR",
                                           provider.get("connector", "fixture")),
+        target_provider=(os.environ.get("INTAKEPILOT_TARGET")
+                         or provider.get("target", "local") or "local"),
         llm=raw.get("llm", {}),
         llm_escalation=raw.get("llm_escalation", {}) or {},
+        targets=raw.get("targets", {}) or {},
         store=raw.get("store", {}),
         vector=raw.get("vector", {}),
         connectors=raw.get("connectors", {}),
