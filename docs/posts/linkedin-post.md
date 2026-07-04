@@ -1,40 +1,36 @@
 # LinkedIn Post
 
-*(Attach BOTH drawings as images — `docs/assets/workflow.png` first, `docs/assets/architecture.png` second. Paste the text below as-is; LinkedIn keeps the line breaks. Add the GitHub + Medium links before posting.)*
+*(Attach both drawings as images: `docs/assets/workflow.png` first, `docs/assets/architecture.png` second. Paste the text below as-is; LinkedIn keeps the line breaks. Add the GitHub + Medium links before posting.)*
 
 ---
 
-I built and open-sourced IntakePilot. Here's its shipped demo, real numbers, reproducible in 5 minutes with "make dev" — no cloud account, no model download.
+I built and open-sourced IntakePilot. The numbers below are from its shipped demo, reproducible in about five minutes with "make dev". No cloud account, no model download.
 
 A Finance Ops analyst types one sentence: "our monthly vendor report takes 3 days to compile by hand."
 
-Before asking her anything, the system drafts the requirement live — outcome extracted from her words (0.85 confidence), stakeholders inferred from her department, affected systems retrieved from the org glossary, data sensitivity assumed as "internal — override at confirm." Readiness: 34.
+Before asking her anything, the system drafts the requirement live. Outcome extracted from her words at 0.85 confidence, stakeholders inferred from her department, affected systems pulled from the org glossary, data sensitivity assumed as "internal, override at confirm". Readiness: 34.
 
-Then it asks exactly 2 questions, with reasons, against a hard budget of 7 — enforced in Python, not in a prompt (there's a test where a malicious model tries to ask more and can't). Two chip taps: readiness 83, confirm unlocks. She fixes one system the glossary missed. Five quality gates run, and the router explains itself in writing: 'Matched 1 signal for "data-platform": "report".'
+Then it asks 2 questions, with reasons, against a budget that lives in Python code rather than a prompt. There's a test where a malicious model tries to ask more and can't. Two taps: readiness 83, confirm unlocks. She fixes one system the glossary missed. Five quality gates run, and the router explains itself in writing: 'Matched 1 signal for "data-platform": "report".'
 
-The ticket that lands carries every claim with provenance + confidence, her original ask verbatim, and every assumption declared. Her one-field fix becomes a training exemplar for the next intake — the system learns your business from daily use, in ledgers, not fine-tuned weights.
+The ticket keeps her original ask word for word, tags every claim with provenance and confidence, and declares every assumption. Her one-field fix becomes a training example for the next intake. The learning sits in ledgers, not fine-tuned weights, so you can swap models and keep every lesson.
 
-And business users never get technical questions: after confirmation it auto-discovers backend context itself — in the SAP demo, "order info" resolves to VBAK/VBAP and even a custom Z-field (ZZ_PRIORITY_CODE) with its owning team.
+Business users never get technical questions. After confirmation the system discovers backend context on its own. In the SAP demo, "order info" resolves to VBAK/VBAP plus a custom Z-field (ZZ_PRIORITY_CODE) with its owning team.
 
-From there: optional BA pass, functional review, then your PM tool — local repo or GitHub issues today, Jira/ADO via the same one-class protocol next. AI coding agents are only as good as the ticket that feeds them — this makes that ticket.
+From there: an optional BA pass, functional review, then your PM tool. Local repo or GitHub issues today, Jira/ADO next via the same one-class protocol. AI coding agents are only as good as the ticket that feeds them. This makes that ticket.
 
-And the loops close. Duplicates get caught against the org's real history and attached with one click. When a team relabels a ticket to another queue, a webhook teaches the router it was wrong. Corrections replay as a self-writing eval suite that scores extraction accuracy on YOUR data. Intake even runs inside Slack/Teams through one endpoint — answer by number, type "confirm", done. 100+ tests pin every invariant.
+The feedback loops are live, not planned. Duplicates get caught against real history and attached with one click. A relabeled ticket teaches the router it picked the wrong queue. Corrections replay as an eval suite that scores extraction accuracy on your own data. Intake also runs inside Slack or Teams through a single endpoint: answer by number, type "confirm", done. 100+ tests pin the invariants.
 
-The two drawings attached are the whole system: sheet 1 is the workflow every role shares, sheet 2 is the architecture that makes it deployable anywhere — laptop, air-gapped data center, any cloud.
+Two things I didn't compromise on.
 
-Two design choices I refuse to compromise on:
+1. The LLM is a component, never in control. Deterministic code owns budgets, merges, gates and routing, and adversarial tests prove it.
 
-1. The LLM is a component, never in control. Deterministic code owns budgets, merges, gates, routing — and adversarial tests prove it.
+2. Your model, your choice, including hybrid. Is a local LLM smart enough to understand the business? On day one, maybe not. So a stronger model (cloud or a bigger internal one) answers only the hard turns where the local model's output fails validation, and every correction makes the local model better on your business until those escalations mostly stop. Your processes are core IP. Nothing leaves your network unless you decide it should.
 
-2. Your model, your choice — including hybrid. "Is a local LLM smart enough to understand the business?" On day one, maybe not — so a stronger model (cloud frontier or a bigger internal one) answers ONLY the hard turns where the local model's output fails validation. Every human correction becomes a training exemplar on your side of the firewall, so the local model gets smarter on YOUR business with daily use and expensive escalations taper toward zero. Your processes are core IP — nothing has to leave your network unless you choose. Laptop, air-gapped data center, or any cloud.
+The two drawings attached are the whole system. Sheet 1 is the workflow every role shares. Sheet 2 is the architecture that makes it run anywhere: laptop, air-gapped data center, any cloud.
 
-And it learns: every human correction becomes an exemplar that improves the next intake. Model-agnostic, because the learning lives in data, not weights.
+Code + drawings: [GitHub link]
+Longer write-up: [Medium link]
 
-If you're in the SAP world staring at the 2027 ECC deadline with a migration backlog of ten thousand requirement conversations — this is the upstream tooling I wished existed.
+What would make this useful for your intake process? Asking because I want to build the next piece against real needs.
 
-Code + architecture: [GitHub link]
-Full story: [Medium link]
-
-What would make this useful for YOUR intake process? Genuinely asking.
-
-#AI #EnterpriseAI #SAP #S4HANA #RequirementsEngineering #LocalLLM #OpenSource #BusinessAnalysis #DigitalTransformation #Jira
+#EnterpriseAI #SAP #S4HANA #RequirementsEngineering #LocalLLM #OpenSource
