@@ -58,12 +58,28 @@ class StrongLLM:
 
 async def test_escalation_rescues_after_two_primary_failures():
     primary, strong = BrokenLLM(), StrongLLM()
-    data = await complete_validated(EscalatingLLM(primary, strong), MSGS, SCHEMA)
+    tiered = EscalatingLLM(primary, strong)
+    seen: list[str] = []
+
+    async def hook(detail: str) -> None:
+        seen.append(detail)
+
+    tiered.on_escalation = hook
+    data = await complete_validated(tiered, MSGS, SCHEMA)
     assert data == {"slots": {"ok": True}}
     assert primary.calls == 2, "primary gets exactly its usual attempt + retry"
     assert strong.calls == 1, "escalation gets exactly one attempt"
     # The escalation prompt carries the failure context, not a bare re-ask.
     assert any("failed validation" in m.content for m in strong.seen[0])
+    # Observability: counters + hook fire on every escalation.
+    assert tiered.stats == {"validated_calls": 1, "escalations": 1, "rescues": 1}
+    assert seen and "JSON" in seen[0]
+
+
+async def test_stats_track_primary_successes_without_escalation():
+    tiered = EscalatingLLM(StrongLLM(), StrongLLM())
+    await complete_validated(tiered, MSGS, SCHEMA)
+    assert tiered.stats == {"validated_calls": 1, "escalations": 0, "rescues": 0}
 
 
 async def test_no_escalation_configured_keeps_existing_contract():

@@ -102,6 +102,11 @@ class EscalatingLLM:
         self.primary = primary
         self.escalation = escalation
         self.name = f"{primary.name}+{escalation.name}"
+        # Observability: "escalations taper off as exemplars accumulate" is a
+        # headline claim — these counters (and the on_escalation hook, wired
+        # to the outcome ledger by AppContext) make it measurable.
+        self.stats = {"validated_calls": 0, "escalations": 0, "rescues": 0}
+        self.on_escalation = None  # optional async hook(failure_detail: str)
 
     async def complete(self, messages: list[Msg], *,
                        json_schema: dict | None = None,
@@ -140,6 +145,10 @@ async def complete_validated(provider: LLMProvider, messages: list[Msg],
                              json_schema: dict, **kw) -> Any:
     """The one wrapper. Never trust structured output; validate, retry once,
     escalate once to the stronger model if one is configured, then raise."""
+    stats = getattr(provider, "stats", None)
+    if stats is not None:
+        stats["validated_calls"] += 1
+
     result = await provider.complete(messages, json_schema=json_schema, **kw)
     data, failure = _parse(result, json_schema)
     if failure is None:
@@ -155,11 +164,18 @@ async def complete_validated(provider: LLMProvider, messages: list[Msg],
     # tier (EscalatingLLM only). Same messages, same validation, no loop.
     escalation = getattr(provider, "escalation", None)
     if escalation is not None:
+        if stats is not None:
+            stats["escalations"] += 1
+        hook = getattr(provider, "on_escalation", None)
+        if hook is not None:
+            await hook(failure)
         result = await escalation.complete(
             _retry_messages(messages, result, failure),
             json_schema=json_schema, **kw)
         data, failure = _parse(result, json_schema)
         if failure is None:
+            if stats is not None:
+                stats["rescues"] += 1
             return data
 
     raise ExtractionError(failure)
