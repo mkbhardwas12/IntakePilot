@@ -1,6 +1,6 @@
 # LinkedIn Post
 
-*(Attach `docs/assets/workflow-social.png` FIRST — the mobile-friendly version — and `docs/assets/architecture.png` second. The detailed engineering sheet `workflow.png` stays in the repo/Medium. Paste the text below as-is; it is ~3,008 characters, under LinkedIn's 3,000 limit. Add the GitHub + Medium links before posting.)*
+*(Attach `docs/assets/workflow-social.png` FIRST — the mobile-friendly version — and `docs/assets/architecture.png` second. The detailed engineering sheet `workflow.png` stays in the repo/Medium. Paste the text below as-is; it is ~2,997 characters, under LinkedIn's 3,000 limit. Add the GitHub + Medium links before posting.)*
 
 ---
 
@@ -12,7 +12,7 @@ I heard it often enough that I stopped nodding and started building, in my own t
 
 It turns a plain-language business ask into a structured, quality-gated, correctly routed, code-ready requirement. Local-first: your model, your data, your network boundary.
 
-Demo example: "our monthly vendor report takes 3 days to compile by hand."
+Demo ask: "our monthly vendor report takes 3 days to compile by hand."
 
 Before asking anything, it drafts the requirement live: outcome extracted, stakeholders inferred, affected systems pulled from the org glossary, assumptions declared, readiness scored.
 
@@ -26,7 +26,7 @@ The learning lives in ledgers, not model weights: corrections become prompt exem
 
 And it sees the portfolio, not just one ticket. Two different asks touching the same SAP table meet at intake instead of at the merge conflict. Every ticket prices its own pain ("3 days, monthly, by hand" becomes 288 hours a year of doing nothing). Routed work carries generated acceptance criteria. Named stakeholders countersign before the build starts.
 
-The design rule underneath: the LLM proposes, deterministic code decides.
+The rule underneath: the LLM proposes, deterministic code decides.
 
 Local repo and GitHub issues work today; Jira/ADO and the builder-agent scaffold are roadmap via the same protocol.
 
