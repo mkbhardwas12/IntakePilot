@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from core.api.security import require_admin
 
-from core.models import Confirmation, Provenance, Slot, Status
+from core.models import Confirmation, Provenance, Slot, Status, coerce_edit
 from core.agents import enrichment, precedent, renderer
 from core.gates import pipeline, routing
 from core.learning import exemplars as learning
@@ -147,25 +147,6 @@ class ConfirmBody(BaseModel):
     confirmed_by: str | None = None
 
 
-def _coerce_edit(proposed, corrected):
-    """UI edit fields are strings; restore the slot's original type so a
-    list-valued slot edited as "a, b" doesn't become one string, and numeric
-    slots don't silently become text."""
-    if not isinstance(corrected, str):
-        return corrected
-    if isinstance(proposed, list):
-        return [part.strip() for part in corrected.split(",") if part.strip()]
-    if isinstance(proposed, bool):
-        return corrected.strip().lower() in ("true", "yes", "1")
-    if isinstance(proposed, (int, float)):
-        try:
-            num = float(corrected)
-            return int(num) if num.is_integer() and isinstance(proposed, int) else num
-        except ValueError:
-            return corrected
-    return corrected
-
-
 @router.post("/{req_id}/confirm")
 async def confirm(req_id: str, body: ConfirmBody, request: Request):
     """Confirm -> capture edit diffs (the learning asset) -> gates -> routing
@@ -194,7 +175,7 @@ async def _confirm_locked(ctx, req_id: str, body: ConfirmBody):
             continue
         current = obj.slots.get(key)
         proposed = current.value if current else None
-        corrected = _coerce_edit(proposed, corrected)
+        corrected = coerce_edit(proposed, corrected)
         if proposed == corrected:
             continue
         await learning.capture_edit(

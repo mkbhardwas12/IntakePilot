@@ -31,11 +31,14 @@ interface ChatProps {
   budget: Budget | null;
   answered: Record<string, string>;
   disabled: boolean;
+  /** Answers collected but not yet sent (partial question set). */
+  pendingCount: number;
   onSend: (text: string) => void;
   onAnswer: (question: Question, value: string) => void;
+  onSendAnswers: () => void;
 }
 
-export function Chat({ messages, streaming, stage, budget, answered, disabled, onSend, onAnswer }: ChatProps) {
+export function Chat({ messages, streaming, stage, budget, answered, disabled, pendingCount, onSend, onAnswer, onSendAnswers }: ChatProps) {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
@@ -123,12 +126,22 @@ export function Chat({ messages, streaming, stage, budget, answered, disabled, o
 
       <div className="chat-inputbar">
         {budget && <BudgetDots budget={budget} />}
+        {pendingCount > 0 && !streaming && (
+          <div className="pending-answers-row">
+            <span>
+              {pendingCount} answer{pendingCount === 1 ? "" : "s"} ready — answer the rest, or
+            </span>
+            <button type="button" className="send-answers-btn" onClick={onSendAnswers}>
+              Send now
+            </button>
+          </div>
+        )}
         <form className="chat-form" onSubmit={submit}>
           <input
             className="chat-input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={disabled ? "Starting session…" : "Describe what you need…"}
+            placeholder={disabled ? "Starting session…" : pendingCount > 0 ? "Add detail — your answers go with it…" : "Describe what you need…"}
             disabled={disabled || streaming}
             aria-label="Message"
           />
@@ -177,7 +190,7 @@ function QuestionCard({
   return (
     <div className={answeredAlready ? "question-card answered" : "question-card"}>
       <div className="question-text">{question.text}</div>
-      <div className="question-because">because {question.because}</div>
+      <div className="question-because">Why we ask: {question.because}</div>
       {question.options && question.options.length > 0 ? (
         <div className="option-chips">
           {question.options.map((opt) => (

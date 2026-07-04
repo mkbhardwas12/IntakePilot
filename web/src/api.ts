@@ -29,7 +29,12 @@ export interface MetricsResponse {
 }
 
 export interface TurnAnswer { question_id: string; slot_key: string; value: unknown; }
-export interface TurnRequestBody { message: string; answers?: TurnAnswer[]; }
+export interface TurnRequestBody {
+  message: string;
+  answers?: TurnAnswer[];
+  /** Mid-session Shadow Draft revisions: {slot_key: new value}. */
+  revisions?: Record<string, string>;
+}
 
 export type TurnStage = "extracting" | "resolving_gaps" | "composing_questions" | "scoring";
 

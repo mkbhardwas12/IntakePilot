@@ -92,7 +92,7 @@ async def rank(obj: RequirementObject, gaps: list[str],
         if key not in asked_before:
             score += 1.0
         else:
-            because.append("asked earlier without an answer")
+            because.append("asked earlier — still open")
         score += HISTORY_WEIGHT * gains.get(key, 0.0)
         score += (len(order) - order.index(key)) / (len(order) * 10)
         ranked.append(RankedGap(key=key, score=score,

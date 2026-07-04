@@ -119,6 +119,7 @@ class TurnResult(BaseModel):
     questions: list[Question] = []
     confirm_unlocked: bool = False
     degraded: bool = False
+    revised: int = 0
 
 
 class GateResult(BaseModel):
@@ -149,3 +150,23 @@ class ConfirmResponse(BaseModel):
 
 class ExtractionError(Exception):
     """LLM output failed schema validation twice — orchestrator degrades gracefully."""
+
+
+def coerce_edit(proposed: Any, corrected: Any) -> Any:
+    """UI edit fields are strings; restore the slot's original type so a
+    list-valued slot edited as "a, b" doesn't become one string, and numeric
+    slots don't silently become text. Shared by confirmation edits and
+    mid-session revisions."""
+    if not isinstance(corrected, str):
+        return corrected
+    if isinstance(proposed, list):
+        return [part.strip() for part in corrected.split(",") if part.strip()]
+    if isinstance(proposed, bool):
+        return corrected.strip().lower() in ("true", "yes", "1")
+    if isinstance(proposed, (int, float)):
+        try:
+            num = float(corrected)
+            return int(num) if num.is_integer() and isinstance(proposed, int) else num
+        except ValueError:
+            return corrected
+    return corrected
