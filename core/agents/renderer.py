@@ -3,6 +3,10 @@ from __future__ import annotations
 
 from core.config import SlotSchema
 from core.models import Provenance, RequirementObject
+from core.agents import value as value_agent
+
+# Slots rendered as dedicated sections, not generic slot lines.
+_SPECIAL_SLOTS = ("backend_context", "cost_of_delay")
 
 
 def _fmt(value) -> str:
@@ -18,8 +22,8 @@ def business_render(obj: RequirementObject, schema: SlotSchema) -> str:
     if outcome and outcome.value:
         lines += [f"**What should change:** {_fmt(outcome.value)}", ""]
     for key, spec in schema.slots.items():
-        if key in ("business_outcome", "backend_context"):
-            continue  # backend_context gets its own structured section
+        if key == "business_outcome" or key in _SPECIAL_SLOTS:
+            continue  # special slots get their own structured sections
         slot = obj.slots.get(key)
         if slot is None or slot.value in (None, "", []):
             continue
@@ -29,6 +33,10 @@ def business_render(obj: RequirementObject, schema: SlotSchema) -> str:
         elif slot.provenance == Provenance.RETRIEVED and slot.source:
             suffix = f" _(from {slot.source})_"
         lines.append(f"- **{spec.label}:** {_fmt(slot.value)}{suffix}")
+    cod = obj.slots.get("cost_of_delay")
+    if cod and isinstance(cod.value, dict):
+        lines += ["", f"**Estimated cost of doing nothing:** "
+                      f"{value_agent.describe(cod.value)}"]
     if obj.assumptions:
         lines += ["", f"_{len(obj.assumptions)} assumption(s) applied — "
                       "review the assumption register before confirming._"]
@@ -83,13 +91,19 @@ def ticket_render(obj: RequirementObject, schema: SlotSchema) -> tuple[str, str]
             f"- Readiness at confirmation: {obj.readiness_score}", "",
             "## Slots", ""]
     for key, spec in schema.slots.items():
-        if key == "backend_context":
-            continue  # rendered as its own section below
+        if key in _SPECIAL_SLOTS:
+            continue  # rendered as their own sections below
         slot = obj.slots.get(key)
         if slot is None or slot.value in (None, "", []):
             continue
         prov = slot.provenance.value if slot.provenance else "?"
         body.append(f"- **{spec.label}** ({prov}, {slot.confidence:.2f}): {_fmt(slot.value)}")
+    cod = obj.slots.get("cost_of_delay")
+    if cod and isinstance(cod.value, dict):
+        body += ["", "## Value (auto)", "",
+                 "_Priced deterministically from the requester's own words — "
+                 "verify before using in a business case._", "",
+                 f"- Estimated cost of doing nothing: **{value_agent.describe(cod.value)}**"]
     body += backend_context_section(obj)
     body += ["", "## Original ask (verbatim)", "", f"> {obj.ask_verbatim}"]
     if obj.assumptions:

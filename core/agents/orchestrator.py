@@ -26,6 +26,7 @@ from core.models import (ExtractionError, Provenance, Question,
                          RequirementObject, Slot, Status, TurnResult,
                          coerce_edit)
 from core.agents import gap_analyzer, intake, precedent, question_composer
+from core.agents import value as value_agent
 from core.learning import exemplars as learning
 
 Emit = Callable[[str, dict], Awaitable[None]]
@@ -264,6 +265,19 @@ class Orchestrator:
                 # spend no budget on it.
                 degraded = True
                 obj.touch("extraction_failed", str(exc)[:300])
+
+        # 1b. VALUE: price the pain deterministically from the requester's
+        # own words (duration × cadence). askable:false — never asked.
+        if ("cost_of_delay" in schema.slots
+                and gap_analyzer.is_empty(obj.slots.get("cost_of_delay"))):
+            priced = value_agent.extract_cost_of_delay(
+                f"{obj.ask_verbatim} {user_msg}")
+            if priced:
+                obj.slots["cost_of_delay"] = Slot(
+                    value=priced, provenance=Provenance.EXTRACTED,
+                    confidence=0.75, source="deterministic_value_extractor")
+                await send("slot", {"key": "cost_of_delay",
+                                    "slot": obj.slots["cost_of_delay"].model_dump()})
 
         # 2. GAP LADDER (deterministic order: infer, then retrieve)
         await send("status", {"stage": "resolving_gaps"})

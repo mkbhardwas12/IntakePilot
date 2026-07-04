@@ -43,6 +43,10 @@ slots:
     required: false
     askable: false          # tech enrichment
     label: Non-functional requirements
+  cost_of_delay:
+    required: false
+    askable: false          # priced deterministically from the ask, never asked
+    label: Cost of delay
   backend_context:
     required: false
     askable: false          # ADDENDUM-01: discovered via connectors, NEVER asked

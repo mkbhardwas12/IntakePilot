@@ -53,6 +53,10 @@ slots:
     required: false
     askable: false
     label: Non-functional needs
+  cost_of_delay:
+    required: false
+    askable: false          # priced deterministically from the ask, never asked
+    label: Cost of delay
   backend_context:
     required: false
     askable: false          # ADDENDUM-01: discovered, never asked
