@@ -137,6 +137,9 @@ async def _confirm_locked(ctx, req_id: str, body: ConfirmBody):
         title, ticket_body = renderer.ticket_render(obj, ctx.schema)
         ticket = await ctx.target.create_item(obj, title, ticket_body, decision.queue)
         obj.status = Status.ROUTED
+        # Re-index with the final slots AND the queue: this is the routing
+        # classifier's precedent signal for future intakes.
+        await precedent.index_requirement(ctx.vector, obj, queue=decision.queue)
         obj.touch("routed", f"queue={decision.queue} ticket={ticket.ref}")
         await ctx.store.log("outcome_ledger", {
             "req_id": req_id, "stage": "routed", "verdict": "created",
