@@ -63,6 +63,48 @@ async def get_render(req_id: str, request: Request):
     return {"business": renderer.business_render(obj, ctx.schema)}
 
 
+class RerouteBody(BaseModel):
+    queue: str
+
+
+async def apply_reroute(ctx, req_id: str, new_queue: str) -> dict:
+    """Shared by the reroute endpoint and the GitHub webhook. The downstream
+    team moving a ticket to another queue is the routing classifier's ground
+    truth: it is logged (feeding routing_accuracy) and the requirement is
+    re-indexed under the corrected queue so future similar asks route there."""
+    from core.agents import precedent
+    async with ctx.orchestrator.lock_for(req_id):
+        try:
+            obj = await ctx.store.latest(req_id)
+        except KeyError:
+            raise HTTPException(404, "requirement not found")
+        if obj.status != Status.ROUTED:
+            raise HTTPException(409, f"only routed requirements can be rerouted "
+                                     f"(status is {obj.status.value})")
+        old_queue = obj.routing.queue if obj.routing else None
+        if old_queue == new_queue:
+            return {"req_id": req_id, "changed": False, "queue": new_queue}
+        obj.version += 1
+        if obj.routing:
+            obj.routing.queue = new_queue
+        obj.touch("rerouted", f"{old_queue} -> {new_queue} (human signal)")
+        await ctx.store.log("outcome_ledger", {
+            "req_id": req_id, "stage": "reroute", "verdict": "changed",
+            "detail": {"from": old_queue, "to": new_queue}})
+        await ctx.store.put_version(obj)
+        # Correct the precedent signal: future similar asks learn from this.
+        await precedent.index_requirement(ctx.vector, obj, queue=new_queue)
+        return {"req_id": req_id, "changed": True,
+                "queue": new_queue, "previous": old_queue}
+
+
+@router.post("/{req_id}/reroute")
+async def reroute(req_id: str, body: RerouteBody, request: Request):
+    """Ops/ticket-tool feedback channel (not session-bound: the signal comes
+    from the assigned team's side, e.g. a webhook — front with your proxy)."""
+    return await apply_reroute(_ctx(request), req_id, body.queue.strip())
+
+
 class AttachBody(BaseModel):
     target_req_id: str
 

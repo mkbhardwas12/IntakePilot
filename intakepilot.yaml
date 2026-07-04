@@ -11,6 +11,7 @@ provider:
   store: sqlite      # sqlite | postgres
   vector: local      # local | pgvector
   connector: fixture # fixture | none  (real SAP/JDBC connectors: cloud path)
+  target: local      # local | github  (env: INTAKEPILOT_TARGET)
 
 llm:
   mock: { dim: 768 }
@@ -41,6 +42,11 @@ vector:
 
 connectors:
   fixture: { dir: core/schemas/systems }   # ADDENDUM-01 demo systems
+
+targets:
+  github:
+    repo: ""            # "org/repo" — required for the github target
+    token_env: GITHUB_TOKEN
 
 budget: { max: 7, per_turn: 3 }
 readiness: { confirm_threshold: 70 }
