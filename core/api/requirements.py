@@ -121,7 +121,7 @@ async def _confirm_locked(ctx, req_id: str, body: ConfirmBody):
     # 3. Gates (pure functions; failures logged, object never mutated by them).
     from core.agents.orchestrator import readiness
     obj.readiness_score = readiness(obj, ctx.schema)
-    gates = await pipeline.run_gates(ctx.llm, obj, ctx.schema)
+    gates = await pipeline.run_gates(ctx.llm, obj, ctx.schema, vector=ctx.vector)
     for g in gates:
         await ctx.store.log("outcome_ledger", {
             "req_id": req_id, "stage": f"gate{g.gate}",

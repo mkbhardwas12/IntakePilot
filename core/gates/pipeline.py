@@ -83,12 +83,15 @@ def gate3_ambiguity(obj: RequirementObject, schema: SlotSchema,
     return GateResult(gate=3, name=GATE_NAMES[3], passed=True)
 
 
-async def _rubric_gate(llm, gate: int, obj: RequirementObject, criteria: str) -> GateResult:
+async def _rubric_gate(llm, gate: int, obj: RequirementObject, criteria: str,
+                       context: str = "") -> GateResult:
     slots = {k: s.value for k, s in obj.slots.items() if s.value not in (None, "", [])}
     system = (f"TASK: gate{gate}\nYou are a requirement quality gate "
               f"({GATE_NAMES[gate]}). Criteria: {criteria}\n"
               "Output JSON: {\"passed\": bool, \"reason\": str, \"suggestion\": str}.")
     user = f"Requirement slots:\n{json.dumps(slots, default=str)}\nAsk: {obj.ask_verbatim}"
+    if context:
+        user += f"\n{context}"
     try:
         data = await complete_validated(
             llm, [Msg(role="system", content=system), Msg(role="user", content=user)],
@@ -101,13 +104,53 @@ async def _rubric_gate(llm, gate: int, obj: RequirementObject, criteria: str) ->
                       reason=data.get("reason"), suggestion=data.get("suggestion"))
 
 
-async def run_gates(llm, obj: RequirementObject, schema: SlotSchema) -> list[GateResult]:
+# Cosine similarity at or above this fails gate 4 deterministically — no
+# LLM judgement needed when the org index already contains a near-identical ask.
+DUPLICATE_FAIL_SCORE = 0.92
+
+
+async def _duplicate_candidates(vector, obj: RequirementObject) -> list:
+    """Top similar past requirements from the org index (self excluded).
+    These are the 'known work' gate 4 compares against — without them the
+    conflict/duplicate rubric has nothing to detect duplicates WITH."""
+    if vector is None:
+        return []
+    hits = await vector.search(obj.ask_verbatim, k=6,
+                               filter={"table": "requirements"})
+    return [h for h in hits if h.meta.get("req_id") != obj.req_id][:4]
+
+
+async def gate4_conflict(llm, obj: RequirementObject, vector=None) -> GateResult:
+    candidates = await _duplicate_candidates(vector, obj)
+    if candidates and candidates[0].score >= DUPLICATE_FAIL_SCORE:
+        top = candidates[0]
+        dup_id = top.meta.get("req_id", top.id)
+        return GateResult(
+            gate=4, name=GATE_NAMES[4], passed=False,
+            reason=(f"near-duplicate of {dup_id} "
+                    f"(similarity {top.score:.2f}): “{top.text[:100]}”"),
+            suggestion=f"review {dup_id} and attach to it, or reword to distinguish")
+    if candidates:
+        lines = "\n".join(
+            f"- {h.meta.get('req_id', h.id)} (similarity {h.score:.2f}): {h.text[:140]}"
+            for h in candidates)
+        context = ("Known existing requirements from the org index "
+                   "(compare against these):\n" + lines)
+    else:
+        context = "Known existing requirements from the org index: none found."
+    return await _rubric_gate(
+        llm, 4, obj,
+        "Conflict/duplicate: does this contradict or duplicate the known "
+        "existing requirements listed below?", context=context)
+
+
+async def run_gates(llm, obj: RequirementObject, schema: SlotSchema,
+                    vector=None) -> list[GateResult]:
     results = [gate1_schema(obj, schema)]
     results.append(await _rubric_gate(
         llm, 2, obj, "INVEST: independent, negotiable, valuable, estimable, small, testable."))
     results.append(gate3_ambiguity(obj, schema))
-    results.append(await _rubric_gate(
-        llm, 4, obj, "Conflict/duplicate: does this contradict or duplicate known work?"))
+    results.append(await gate4_conflict(llm, obj, vector))
     results.append(await _rubric_gate(
         llm, 5, obj, "Routing sanity: is there enough signal to route to one team queue?"))
     return results
