@@ -1,7 +1,10 @@
 """Application context — providers built once from config, shared by routers."""
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timezone
+
+from core.models import Budget, RequirementObject, Requester
 
 from core.config import (Config, SlotSchema, load_all_slot_schemas,
                          load_config)
@@ -78,6 +81,29 @@ class AppContext:
     def schema_for(self, request_type: str) -> SlotSchema:
         """The slot-schema fork for a request type; unknown types use default."""
         return self.schemas.get(request_type, self.schema)
+
+    async def start_session(self, requester: Requester,
+                            session_id: str | None = None) -> tuple[dict, RequirementObject]:
+        """Create requirement + session — shared by the web sessions router
+        and channel adapters (which supply deterministic session ids)."""
+        req_id = await self.new_req_id()
+        obj = RequirementObject(
+            req_id=req_id, requester=requester, ask_verbatim="",
+            question_budget=Budget(max=self.cfg.budget_max,
+                                   per_turn=self.cfg.budget_per_turn))
+        obj.touch("session_created", f"requester={requester.name} dept={requester.dept}")
+        await self.store.put_version(obj)
+        session = {
+            "session_id": session_id or uuid.uuid4().hex[:12],
+            "req_id": req_id,
+            "turns": [],
+            "pending_questions": [],
+            "budget_spent": 0,
+            "requester": requester.model_dump(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await self.store.put_session(session)
+        return session, obj
 
     async def new_req_id(self) -> str:
         year = datetime.now(timezone.utc).year
