@@ -1,8 +1,10 @@
 """Requirements router — latest, history, plain-language render, confirm."""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+
+from core.api.security import require_admin
 
 from core.models import Confirmation, Provenance, Slot, Status
 from core.agents import enrichment, precedent, renderer
@@ -98,10 +100,11 @@ async def apply_reroute(ctx, req_id: str, new_queue: str) -> dict:
                 "queue": new_queue, "previous": old_queue}
 
 
-@router.post("/{req_id}/reroute")
+@router.post("/{req_id}/reroute", dependencies=[Depends(require_admin)])
 async def reroute(req_id: str, body: RerouteBody, request: Request):
     """Ops/ticket-tool feedback channel (not session-bound: the signal comes
-    from the assigned team's side, e.g. a webhook — front with your proxy)."""
+    from the assigned team's side). Guarded by INTAKEPILOT_ADMIN_TOKEN when
+    configured; the GitHub webhook path is guarded by its HMAC secret."""
     return await apply_reroute(_ctx(request), req_id, body.queue.strip())
 
 

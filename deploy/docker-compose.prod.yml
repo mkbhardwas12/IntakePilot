@@ -52,6 +52,8 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       INTAKEPILOT_TARGET: ${INTAKEPILOT_TARGET:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      INTAKEPILOT_ADMIN_TOKEN: ${INTAKEPILOT_ADMIN_TOKEN:-}
+      INTAKEPILOT_WEBHOOK_SECRET: ${INTAKEPILOT_WEBHOOK_SECRET:-}
     depends_on:
       db: { condition: service_healthy }
     volumes:

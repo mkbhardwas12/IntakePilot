@@ -8,11 +8,13 @@ the recurring connector re-scan.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from core.agents import enrichment
+from core.api.security import require_admin
 
-router = APIRouter(prefix="/api/kb", tags=["system-kb"])
+router = APIRouter(prefix="/api/kb", tags=["system-kb"],
+                   dependencies=[Depends(require_admin)])
 
 
 def _ctx(request: Request):

@@ -1,11 +1,15 @@
 """Evals router — corrections-as-evals over the live ledgers."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 
+from core.api.security import require_admin
 from core.learning import replay
 
-router = APIRouter(prefix="/api/evals", tags=["evals"])
+# Admin-guarded: replay runs real LLM completions — an expensive-compute
+# endpoint nobody anonymous should be able to hammer.
+router = APIRouter(prefix="/api/evals", tags=["evals"],
+                   dependencies=[Depends(require_admin)])
 
 
 @router.get("/replay")

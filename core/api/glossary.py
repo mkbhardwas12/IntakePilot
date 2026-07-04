@@ -8,12 +8,14 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
+from core.api.security import require_admin
 from core.learning import proposals as proposal_engine
 
-router = APIRouter(prefix="/api/glossary", tags=["glossary"])
+router = APIRouter(prefix="/api/glossary", tags=["glossary"],
+                   dependencies=[Depends(require_admin)])
 
 
 def _ctx(request: Request):

@@ -23,6 +23,10 @@ open http://localhost:3000/loop
 # type: "our monthly vendor report takes 3 days to compile by hand"
 # watch the Shadow Draft build, answer <= 3 questions, confirm,
 # see the ticket appear in examples/demo-repo/
+#
+# Note: run the SAME ask twice and gate 4 will (correctly) catch the second
+# as a near-duplicate of the first — click "Attach to IPR-…" to see the
+# dedup flow, reword the ask, or `make clean` to reset the demo database.
 ```
 
 Or run the pieces separately:
