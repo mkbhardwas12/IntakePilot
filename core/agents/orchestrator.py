@@ -181,7 +181,8 @@ class Orchestrator:
             await send("status", {"stage": "composing_questions"})
             asked_before = {e.detail.split(":", 1)[0] for e in obj.audit
                             if e.event == "question_asked"}
-            ranked = await gap_analyzer.rank(obj, gaps, self.schema, asked_before)
+            ranked = await gap_analyzer.rank(obj, gaps, self.schema, asked_before,
+                                             store=self.store)
             ranked = [g for g in ranked if self.schema.slots[g.key].askable]
             n = min(len(ranked), obj.question_budget.per_turn,
                     obj.question_budget.max - obj.question_budget.spent)
