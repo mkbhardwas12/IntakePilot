@@ -54,12 +54,20 @@ async def metrics(request: Request):
     confirmed_ids = set()
     latencies: list[float] = []
     assumed, filled = 0, 0
+    backlog_value: list[dict] = []
     for session in sessions:
         req_id = session["req_id"]
         try:
             obj = await store.latest(req_id)
         except KeyError:
             continue
+        cod = obj.slots.get("cost_of_delay")
+        if (req_id in routed_ids and cod and isinstance(cod.value, dict)
+                and cod.value.get("annual_hours")):
+            backlog_value.append({
+                "req_id": req_id,
+                "queue": obj.routing.queue if obj.routing else None,
+                "annual_hours": cod.value["annual_hours"]})
         if obj.confirmation is not None:
             confirmed_ids.add(req_id)
             assumed += len(obj.assumptions)
@@ -108,6 +116,14 @@ async def metrics(request: Request):
         "analyst_hours_displaced": round(
             confirmed * ctx.cfg.analyst_baseline_hours, 1),
         "assumption_rate": round(assumed / filled, 3) if filled else None,
+        # I2: the routed backlog, priced — sort work by value, not noise.
+        "cost_of_delay": {
+            "routed_annual_hours": round(
+                sum(b["annual_hours"] for b in backlog_value), 1),
+            "top_backlog": sorted(backlog_value,
+                                  key=lambda b: b["annual_hours"],
+                                  reverse=True)[:5],
+        },
         # Hybrid model strategy: how often the primary model needed the
         # stronger tier. The pitch says this tapers as exemplars accumulate —
         # this is where that claim becomes measurable.
