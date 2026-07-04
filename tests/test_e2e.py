@@ -72,7 +72,7 @@ async def test_golden_scenario_vendor_report(client):
     # Confirm with one human edit — the learning asset.
     resp = await client.post(f"/api/requirements/{req_id}/confirm", json={
         "edits": {"affected_systems": ["ERP-VendorMaster", "BI-Reporting", "BW4"]},
-        "confirmed_by": "Demo User"})
+        "confirmed_by": "Demo User"}, headers={"X-Session-Id": sid})
     confirm = resp.json()
     assert all(g["passed"] for g in confirm["gates"])
     assert len(confirm["gates"]) == 5
@@ -101,7 +101,8 @@ async def test_golden_scenario_vendor_report(client):
     assert "BW4" in exemplar_text and "affected_systems" in exemplar_text
 
     # History is append-only and complete.
-    resp = await client.get(f"/api/requirements/{req_id}/history")
+    resp = await client.get(f"/api/requirements/{req_id}/history",
+                            headers={"X-Session-Id": sid})
     versions = [o["version"] for o in resp.json()]
     assert versions == sorted(versions) and len(versions) >= 4
 

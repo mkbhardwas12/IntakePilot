@@ -23,15 +23,33 @@ async def _latest(ctx, req_id: str):
         raise HTTPException(404, "requirement not found")
 
 
+async def _authorize(ctx, request: Request, req_id: str) -> None:
+    """Requirements are session-bound. IDs are sequential (IPR-{year}-{seq}),
+    so without this check anyone could enumerate all requirements — or worse,
+    confirm someone else's draft. The caller must present the X-Session-Id of
+    the session that created the requirement. Wrong or unknown pairs return
+    404 (not 403) so the endpoint leaks nothing about which IDs exist."""
+    session_id = request.headers.get("X-Session-Id")
+    if not session_id:
+        raise HTTPException(401, "X-Session-Id header required")
+    session = await ctx.store.get_session(session_id)
+    if session is None or session.get("req_id") != req_id:
+        raise HTTPException(404, "requirement not found")
+
+
 @router.get("/{req_id}")
 async def get_requirement(req_id: str, request: Request):
-    obj = await _latest(_ctx(request), req_id)
+    ctx = _ctx(request)
+    await _authorize(ctx, request, req_id)
+    obj = await _latest(ctx, req_id)
     return obj.model_dump(mode="json")
 
 
 @router.get("/{req_id}/history")
 async def get_history(req_id: str, request: Request):
-    history = await _ctx(request).store.history(req_id)
+    ctx = _ctx(request)
+    await _authorize(ctx, request, req_id)
+    history = await ctx.store.history(req_id)
     if not history:
         raise HTTPException(404, "requirement not found")
     return [o.model_dump(mode="json") for o in history]
@@ -40,6 +58,7 @@ async def get_history(req_id: str, request: Request):
 @router.get("/{req_id}/render")
 async def get_render(req_id: str, request: Request):
     ctx = _ctx(request)
+    await _authorize(ctx, request, req_id)
     obj = await _latest(ctx, req_id)
     return {"business": renderer.business_render(obj, ctx.schema)}
 
@@ -76,6 +95,7 @@ async def confirm(req_id: str, body: ConfirmBody, request: Request):
     race an in-flight turn or a second confirm (which previously created a
     ticket and then 500'd on the append-only version write)."""
     ctx = _ctx(request)
+    await _authorize(ctx, request, req_id)
     async with ctx.orchestrator.lock_for(req_id):
         return await _confirm_locked(ctx, req_id, body)
 
