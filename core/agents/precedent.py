@@ -99,10 +99,15 @@ async def retrieve_pass(obj: RequirementObject, gaps: list[str], store, vector,
     return gaps, hits
 
 
-async def index_requirement(vector, obj: RequirementObject) -> None:
+async def index_requirement(vector, obj: RequirementObject,
+                            queue: str | None = None) -> None:
+    """Index the requirement for precedent retrieval, gate-4 duplicate
+    candidates, and — once routed (queue set) — the routing precedent signal."""
     outcome = obj.slots.get("business_outcome")
     text = obj.ask_verbatim + " " + str(outcome.value if outcome else "")
     slot_values = {k: s.value for k, s in obj.slots.items() if s.value not in (None, "", [])}
-    await vector.upsert(f"req:{obj.req_id}", text,
-                        {"table": "requirements", "req_id": obj.req_id,
-                         "slots": slot_values})
+    meta = {"table": "requirements", "req_id": obj.req_id,
+            "status": obj.status.value, "slots": slot_values}
+    if queue:
+        meta["queue"] = queue
+    await vector.upsert(f"req:{obj.req_id}", text, meta)
