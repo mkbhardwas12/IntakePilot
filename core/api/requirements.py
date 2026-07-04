@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from core.api.security import require_admin
 
 from core.models import Confirmation, Provenance, Slot, Status, coerce_edit
-from core.agents import enrichment, impact, precedent, renderer
+from core.agents import acceptance, enrichment, impact, precedent, renderer
 from core.gates import pipeline, routing
 from core.learning import exemplars as learning
 
@@ -233,9 +233,18 @@ async def _confirm_locked(ctx, req_id: str, body: ConfirmBody):
     obj.routing = decision
 
     ticket = None
+    acceptance_scenarios: list = []
     if all(g.passed for g in gates):
+        # I3: the third handoff artifact — checkable Given/When/Then generated
+        # from the confirmed (gate-passed, therefore measurable) requirement.
+        acceptance_scenarios = await acceptance.generate(ctx.llm, obj, schema)
+        if acceptance_scenarios:
+            await ctx.store.log("outcome_ledger", {
+                "req_id": req_id, "stage": "acceptance", "verdict": "generated",
+                "detail": {"count": len(acceptance_scenarios)}})
         title, ticket_body = renderer.ticket_render(obj, schema)
         ticket_body += impact.collision_section(collision_hits)
+        ticket_body += acceptance.section(acceptance_scenarios)
         ticket = await ctx.target.create_item(obj, title, ticket_body, decision.queue)
         obj.status = Status.ROUTED
         # Re-index with the final slots AND the queue: this is the routing
@@ -255,4 +264,5 @@ async def _confirm_locked(ctx, req_id: str, body: ConfirmBody):
             "gates": [g.model_dump() for g in gates],
             "routing": decision.model_dump(),
             "collisions": collision_hits,
+            "acceptance": acceptance_scenarios,
             "ticket": ticket.model_dump() if ticket else None}

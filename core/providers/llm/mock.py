@@ -131,6 +131,17 @@ class MockLLM:
             data = _compose_questions(full)
         elif task.startswith("gate"):
             data = {"passed": True, "reason": None, "suggestion": None}
+        elif task == "acceptance":
+            ask_m = re.search(r"Ask:\s*(.+)", full)
+            crit_m = re.search(r'"success_criteria":\s*"([^"]+)"', full)
+            ask = (ask_m.group(1).strip() if ask_m else "the confirmed ask")
+            then = (crit_m.group(1) if crit_m
+                    else "the stated success criteria are met")
+            data = {"scenarios": [{
+                "given": f"the systems described in “{ask[:80]}”",
+                "when": "the delivered change runs on its normal trigger",
+                "then": then,
+            }]}
         else:
             data = {}
         return LLMResult(text=json.dumps(data), usage={"provider": "mock"})
