@@ -38,6 +38,8 @@ flowchart LR
 
 **Gates are Jidoka, not vibes.** Gates 1 (schema) and 3 (ambiguity lint with a concrete-anchor check) are deterministic pure functions; gates 2/4/5 (INVEST, conflict, routing sanity) use the LLM as a scored rubric behind a single validate-and-retry wrapper. Failures never mutate the object — they park it as GATED with reasons and suggestions.
 
+**The portfolio layer.** Confirmation doesn't just finish one requirement — it checks it against all open work. Collision detection intersects auto-discovered backend entities across requirements (two different asks touching `sales_order` are connected on the spot: response, audit trail, ticket Impact section, `GET /api/graph` hotspots). Cost-of-delay pricing turns duration × cadence from the requester's own words into an annualized number on the ticket and a backlog-by-value view in metrics — deterministic arithmetic, never an LLM guess. Routed tickets carry generated Given/When/Then acceptance criteria (the validated-LLM wrapper, degrading gracefully), and named stakeholders get countersign records (`/api/requirements/{id}/consent`) so objections land before the build, not after UAT.
+
 **Everything is a ledger.** Requirement versions are append-only (enforced by primary key), and `edit_diffs`, `question_ledger`, `outcome_ledger`, `glossary`, and `system_kb` accumulate the operational history that `/api/metrics` computes Section-9 metrics from — questions per intake, edit rate per field, assumption rate, analyst hours displaced.
 
 ## Repository layout
