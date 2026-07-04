@@ -16,7 +16,7 @@ from core.providers.store.base import AppendOnlyViolation
 
 LEDGER_TABLES = {
     "edit_diffs": ["req_id", "version", "slot_key", "proposed", "corrected",
-                   "context_bucket", "ask_embedding", "created_at"],
+                   "provenance", "context_bucket", "ask_embedding", "created_at"],
     "question_ledger": ["req_id", "slot_key", "question", "outcome",
                         "changed_routing", "changed_slots", "created_at"],
     "outcome_ledger": ["req_id", "stage", "verdict", "detail", "created_at"],
@@ -70,6 +70,11 @@ class SqliteStore:
                 cur.execute(f"""CREATE TABLE IF NOT EXISTS {table} (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, {col_sql})""")
         cur.execute("CREATE TABLE IF NOT EXISTS seq (year INTEGER PRIMARY KEY, n INTEGER)")
+        # Migration for databases created before the provenance column existed.
+        try:
+            cur.execute("ALTER TABLE edit_diffs ADD COLUMN provenance TEXT")
+        except sqlite3.OperationalError:
+            pass  # column already present
         self._conn.commit()
 
     async def put_version(self, obj: RequirementObject) -> None:

@@ -117,8 +117,10 @@ async def _confirm_locked(ctx, req_id: str, body: ConfirmBody):
         corrected = _coerce_edit(proposed, corrected)
         if proposed == corrected:
             continue
-        await learning.capture_edit(ctx.store, ctx.vector, obj, key,
-                                    proposed, corrected)
+        await learning.capture_edit(
+            ctx.store, ctx.vector, obj, key, proposed, corrected,
+            provenance=(current.provenance.value
+                        if current and current.provenance else None))
         obj.slots[key] = Slot(value=corrected, provenance=Provenance.EDITED,
                               confidence=1.0, source="confirmation_edit")
         if key in obj.assumptions:
@@ -130,6 +132,11 @@ async def _confirm_locked(ctx, req_id: str, body: ConfirmBody):
         confirmed_by=body.confirmed_by or obj.requester.name, edits=edit_count)
     obj.status = Status.CONFIRMED
     obj.touch("confirmed", f"{edit_count} edit(s) at confirmation")
+    # Denominator for readiness calibration (edit rate per provenance needs
+    # to know how many confirmations happened in this bucket).
+    await ctx.store.log("outcome_ledger", {
+        "req_id": req_id, "stage": "confirmed", "verdict": "ok",
+        "detail": {"bucket": obj.context_bucket, "edits": edit_count}})
 
     # 2. Backend Metadata Discovery (ADDENDUM-01): after confirmation, before
     # gates/routing. Discovers entities + customizations the requester was
@@ -139,8 +146,9 @@ async def _confirm_locked(ctx, req_id: str, body: ConfirmBody):
                             glossary_hits=glossary_hits)
 
     # 3. Gates (pure functions; failures logged, object never mutated by them).
-    from core.agents.orchestrator import readiness
-    obj.readiness_score = readiness(obj, ctx.schema)
+    from core.agents.orchestrator import calibrated_weights, readiness
+    obj.readiness_score = readiness(
+        obj, ctx.schema, await calibrated_weights(ctx.store, obj.context_bucket))
     gates = await pipeline.run_gates(ctx.llm, obj, ctx.schema, vector=ctx.vector)
     for g in gates:
         await ctx.store.log("outcome_ledger", {

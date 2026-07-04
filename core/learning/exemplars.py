@@ -11,14 +11,18 @@ STALENESS_DAYS = 180
 
 
 async def capture_edit(store, vector, obj, slot_key: str,
-                       proposed, corrected) -> None:
-    """One edit_diffs row + one vector entry per human correction — THE learning asset."""
+                       proposed, corrected, provenance: str | None = None) -> None:
+    """One edit_diffs row + one vector entry per human correction — THE learning
+    asset. `provenance` records HOW the corrected value had been produced
+    (extracted/inferred/retrieved/assumed), which feeds readiness calibration:
+    provenances that humans routinely correct earn less trust."""
     row = {
         "req_id": obj.req_id,
         "version": obj.version,
         "slot_key": slot_key,
         "proposed": proposed,
         "corrected": corrected,
+        "provenance": provenance,
         "context_bucket": obj.context_bucket,
     }
     await store.log("edit_diffs", row)
