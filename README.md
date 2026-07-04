@@ -161,6 +161,12 @@ Implemented and verified (spec milestones 1–5 core, plus gates/routing from 6)
 - `/api/metrics` computing Section 9 metrics from the ledgers (plus
   system-KB counts, escalation rate, duplicate catch rate, and routing
   accuracy from reroute ground truth)
+- Request-type schema forks (bug_report / data_request classified
+  deterministically on the first turn; forks in `core/schemas/*.yaml`, learning
+  buckets are dept×type), an opt-in dynamic question budget scaled by blast
+  radius (`budget.dynamic`), and a generic chat-channel adapter
+  (`POST /api/channels/inbound`) any Slack/Teams bot can call — numbered
+  answers and a 'confirm' keyword complete the whole flow in chat
 - The learning & feedback surface: gate 4 checks real known work (vector
   candidates + deterministic near-duplicate fail) with one-click
   attach-as-duplicate; routing blends keyword and precedent signals and
