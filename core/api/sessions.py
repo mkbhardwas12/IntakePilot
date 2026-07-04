@@ -39,24 +39,8 @@ async def create_session(body: CreateSessionBody, request: Request):
     req = Requester(**(body.requester or {})) if body.requester else Requester()
     if body.requester and "id" not in body.requester:
         req.id = uuid.uuid4().hex[:8]
-    req_id = await ctx.new_req_id()
-    obj = RequirementObject(
-        req_id=req_id, requester=req, ask_verbatim="",
-        question_budget=Budget(max=ctx.cfg.budget_max,
-                               per_turn=ctx.cfg.budget_per_turn))
-    obj.touch("session_created", f"requester={req.name} dept={req.dept}")
-    await ctx.store.put_version(obj)
-    session = {
-        "session_id": uuid.uuid4().hex[:12],
-        "req_id": req_id,
-        "turns": [],
-        "pending_questions": [],
-        "budget_spent": 0,
-        "requester": req.model_dump(),
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    await ctx.store.put_session(session)
-    return {"session_id": session["session_id"], "req_id": req_id,
+    session, obj = await ctx.start_session(req)
+    return {"session_id": session["session_id"], "req_id": session["req_id"],
             "draft": obj.model_dump(mode="json")}
 
 
