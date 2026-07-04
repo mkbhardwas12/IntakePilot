@@ -1,6 +1,6 @@
 # LinkedIn Post
 
-*(Attach `docs/assets/workflow-social.png` FIRST — the mobile-friendly version — and `docs/assets/architecture.png` second. The detailed engineering sheet `workflow.png` stays in the repo/Medium. Paste the text below as-is; it is ~3,067 characters, under LinkedIn's 3,000 limit. Add the GitHub + Medium links before posting.)*
+*(Attach `docs/assets/workflow-social.png` FIRST — the mobile-friendly version — and `docs/assets/architecture.png` second. The detailed engineering sheet `workflow.png` stays in the repo/Medium. Paste the text below as-is; it is ~3,008 characters, under LinkedIn's 3,000 limit. Add the GitHub + Medium links before posting.)*
 
 ---
 
@@ -14,15 +14,15 @@ It turns a plain-language business ask into a structured, quality-gated, correct
 
 Demo example: "our monthly vendor report takes 3 days to compile by hand."
 
-Before asking anything, it drafts the requirement live: outcome extracted from the ask, stakeholders inferred from context, affected systems pulled from the org glossary, every assumption declared, readiness scored.
+Before asking anything, it drafts the requirement live: outcome extracted, stakeholders inferred, affected systems pulled from the org glossary, assumptions declared, readiness scored.
 
 Then it asks only the missing business questions, against a budget enforced in Python, not in a prompt. A malicious model can try to ask more; the orchestrator refuses.
 
 After confirmation, five gates run (schema, INVEST, ambiguity, duplicate detection, routing sanity) and the route is explained in writing. The ticket keeps the original ask word for word, with provenance and confidence on every claim.
 
-Business users are never asked about SAP tables or backend columns. Enrichment resolves that after confirmation. In the demo, "order info" maps to VBAK/VBAP and a custom Z-field with its owning team.
+Business users are never asked about SAP tables or backend columns. Enrichment resolves that after confirmation. In the SAP demo, "order info" maps to VBAK/VBAP and a Z-field with its owning team.
 
-The learning lives in ledgers, not model weights: corrections become prompt exemplars, reroutes teach the router, repeated edits become glossary proposals, and replaying past corrections shows whether accuracy is actually improving.
+The learning lives in ledgers, not model weights: corrections become prompt exemplars, reroutes teach the router, repeated edits become glossary proposals, and replaying old corrections shows whether accuracy is improving.
 
 And it sees the portfolio, not just one ticket. Two different asks touching the same SAP table meet at intake instead of at the merge conflict. Every ticket prices its own pain ("3 days, monthly, by hand" becomes 288 hours a year of doing nothing). Routed work carries generated acceptance criteria. Named stakeholders countersign before the build starts.
 
@@ -35,6 +35,6 @@ The attached drawings show the workflow and the architecture: laptop, air-gapped
 Code + drawings: [GitHub link]
 Longer write-up: [Medium link]
 
-If you try it and something doesn't fit your intake process, tell me. I'd rather improve it against real needs than my own guesses.
+If something doesn't fit your intake process, tell me. I'd rather improve it against real needs than my own guesses.
 
 #EnterpriseAI #SAP #S4HANA #LocalLLM #OpenSource
