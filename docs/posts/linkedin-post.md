@@ -1,6 +1,6 @@
 # LinkedIn Post
 
-*(Attach both drawings as images: `docs/assets/workflow.png` first, `docs/assets/architecture.png` second. Paste the text below as-is; LinkedIn keeps the line breaks. Add the GitHub + Medium links before posting.)*
+*(Attach `docs/assets/workflow-social.png` FIRST — it's the mobile-friendly version with large type. Add `docs/assets/architecture.png` second for the architecture view; the detailed engineering sheet `workflow.png` stays in the repo/Medium. Paste the text below as-is; LinkedIn keeps the line breaks. Add the GitHub + Medium links before posting.)*
 
 ---
 
@@ -30,7 +30,7 @@ Two things I didn't compromise on.
 
 2. Your model, your choice, including hybrid. Is a local LLM smart enough to understand the business? On day one, maybe not. So a stronger model (cloud or a bigger internal one) answers only the hard turns where the local model's output fails validation, and every correction makes the local model better on your business until those escalations mostly stop. Your processes are core IP. Nothing leaves your network unless you decide it should.
 
-The two drawings attached are the whole system. Sheet 1 is the workflow every role shares. Sheet 2 is the architecture that makes it run anywhere: laptop, air-gapped data center, any cloud.
+The drawings attached are the whole system: the workflow every role shares, and the architecture that makes it run anywhere — laptop, air-gapped data center, any cloud. (Detailed engineering sheets are in the repo.)
 
 Code + drawings: [GitHub link]
 Longer write-up: [Medium link]
