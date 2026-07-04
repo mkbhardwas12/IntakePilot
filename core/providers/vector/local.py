@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import threading
 from pathlib import Path
 
@@ -24,12 +25,21 @@ class LocalVectorIndex:
         self._lock = threading.Lock()
         self._items: dict[str, dict] = {}
         if self._path and self._path.exists():
-            self._items = json.loads(self._path.read_text())
+            try:
+                self._items = json.loads(self._path.read_text())
+            except (json.JSONDecodeError, ValueError):
+                # A crash mid-write must not brick startup: the index is a
+                # cache over the ledgers and can be rebuilt by usage.
+                self._items = {}
 
     def _persist(self) -> None:
+        """Atomic: write to a temp file, then rename over the real one, so a
+        crash can never leave a half-written (unparseable) index behind."""
         if self._path:
             self._path.parent.mkdir(parents=True, exist_ok=True)
-            self._path.write_text(json.dumps(self._items))
+            tmp = self._path.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(self._items))
+            os.replace(tmp, self._path)
 
     async def upsert(self, id: str, text: str, meta: dict) -> None:
         vec = (await self._embedder.embed([text]))[0]
