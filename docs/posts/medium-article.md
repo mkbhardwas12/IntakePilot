@@ -2,7 +2,7 @@
 
 *A plain-language ask becomes a routed, code-ready ticket. Local model, your servers, and it learns from every correction.*
 
-*(Cover image: `docs/assets/workflow.png` from the repo. Drop `docs/assets/architecture.png` into the architecture section below.)*
+*(Cover image: `docs/assets/cover.png` — the 2:1 thumbnail. Place `docs/assets/workflow.png` after "The demo, minute by minute" heading, and `docs/assets/architecture.png` where the diagram note appears below.)*
 
 Most of my career has been in enterprise IT, a good part of it in and around SAP landscapes. In all those years I can count on one hand the projects that failed because the technology wasn't good enough. The ones that failed died earlier and quieter than that. A business requirement document that arrived six weeks late and still didn't say what the business meant. A requirement that meant one thing in Finance and something else by the time it reached the build team. An analyst carrying ten open requests who never got the one detail that mattered. And no shared picture anywhere, so the gap stayed invisible until UAT, where fixing it costs the most.
 
