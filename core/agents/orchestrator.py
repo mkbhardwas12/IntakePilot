@@ -23,7 +23,8 @@ from typing import Awaitable, Callable
 
 from core.config import Config, SlotSchema
 from core.models import (ExtractionError, Provenance, Question,
-                         RequirementObject, Slot, Status, TurnResult)
+                         RequirementObject, Slot, Status, TurnResult,
+                         coerce_edit)
 from core.agents import gap_analyzer, intake, precedent, question_composer
 from core.learning import exemplars as learning
 
@@ -153,13 +154,16 @@ class Orchestrator:
 
     async def handle_turn(self, session: dict, user_msg: str,
                           answers: list[dict] | None = None,
-                          emit: Emit | None = None) -> TurnResult:
+                          emit: Emit | None = None,
+                          revisions: dict | None = None) -> TurnResult:
         # One in-flight mutation per requirement (SPEC-REVIEW finding #4).
         async with self.lock_for(session["req_id"]):
-            return await self._turn(session, user_msg, answers or [], emit)
+            return await self._turn(session, user_msg, answers or [],
+                                    revisions or {}, emit)
 
     async def _turn(self, session: dict, user_msg: str,
-                    answers: list[dict], emit: Emit | None) -> TurnResult:
+                    answers: list[dict], revisions: dict,
+                    emit: Emit | None) -> TurnResult:
         async def send(event: str, data: dict) -> None:
             if emit:
                 await emit(event, data)
@@ -171,6 +175,10 @@ class Orchestrator:
         obj.touch("turn_started", user_msg[:200])
         before = {k: s.model_dump() for k, s in obj.slots.items()}
         degraded = False
+        # A revision-only turn (Shadow Draft edit) must not disturb the
+        # question flow: pending questions stay pending (not logged skipped),
+        # no new questions are composed, no defaults applied.
+        interactive = bool(user_msg.strip()) or bool(answers)
 
         # 0. Apply chip/typed answers deterministically (provenance ANSWERED);
         #    log question outcomes to the question ledger.
@@ -204,11 +212,38 @@ class Orchestrator:
                 "question": (q or {}).get("text", ""), "outcome": "answered",
                 "changed_routing": False, "changed_slots": 1})
         for qid, q in pending.items():
-            if qid not in answered_ids:
+            if interactive and qid not in answered_ids:
                 await self.store.log("question_ledger", {
                     "req_id": obj.req_id, "slot_key": q["slot_key"],
                     "question": q.get("text", ""), "outcome": "skipped",
                     "changed_routing": False, "changed_slots": 0})
+
+        # 0.5 Mid-session revisions (human-originated, deterministic): the
+        # user corrected a draft field from the Shadow Draft panel. EDITED
+        # provenance protects it from extraction; correcting a machine-filled
+        # slot is the same learning signal as a confirmation edit.
+        revised = 0
+        for key, corrected in revisions.items():
+            if key not in schema.slots or key == "backend_context":
+                continue
+            current = obj.slots.get(key)
+            proposed = current.value if current else None
+            corrected = coerce_edit(proposed, corrected)
+            if proposed == corrected:
+                continue
+            if current and current.provenance not in (Provenance.ANSWERED,
+                                                      Provenance.EDITED):
+                await learning.capture_edit(
+                    self.store, self.vector, obj, key, proposed, corrected,
+                    provenance=(current.provenance.value
+                                if current.provenance else None))
+            obj.slots[key] = Slot(value=corrected, provenance=Provenance.EDITED,
+                                  confidence=1.0, source="mid_session_revision")
+            if key in obj.assumptions:
+                obj.assumptions.remove(key)
+            revised += 1
+            obj.touch("slot_revised", f"{key}: {proposed!r} -> {corrected!r}")
+            await send("slot", {"key": key, "slot": obj.slots[key].model_dump()})
 
         # 1. EXTRACT (LLM proposes; code validates) — with correction exemplars.
         if user_msg.strip():
@@ -244,7 +279,8 @@ class Orchestrator:
         if self.cfg.budget_dynamic:
             obj.question_budget.max = dynamic_budget_max(obj, self.cfg)
         questions: list[Question] = []
-        if gaps and obj.question_budget.spent < obj.question_budget.max and not degraded:
+        if (interactive and gaps and not degraded
+                and obj.question_budget.spent < obj.question_budget.max):
             await send("status", {"stage": "composing_questions"})
             asked_before = {e.detail.split(":", 1)[0] for e in obj.audit
                             if e.event == "question_asked"}
@@ -262,7 +298,7 @@ class Orchestrator:
                 obj.touch("question_asked", f"{q.slot_key}: {q.text}")
 
         # 4. BUDGET EXHAUSTED -> assumptions with stated defaults
-        if not questions:
+        if interactive and not questions:
             obj = apply_defaults(obj, remaining=gaps, schema=schema)
             for key in obj.assumptions:
                 slot = obj.slots.get(key)
@@ -275,7 +311,8 @@ class Orchestrator:
             obj, schema,
             await calibrated_weights(self.store, obj.context_bucket))
         confirm_unlocked = obj.readiness_score >= self.cfg.confirm_threshold
-        if questions:
+        still_pending = not interactive and bool(session.get("pending_questions"))
+        if questions or still_pending:
             obj.status = Status.QUESTIONING
         elif confirm_unlocked and obj.status in (Status.DRAFT, Status.QUESTIONING):
             obj.status = Status.AWAITING_CONFIRMATION
@@ -288,9 +325,11 @@ class Orchestrator:
         await send("questions", {"questions": [q.model_dump() for q in questions]})
 
         # Session bookkeeping (pending questions, transcript)
-        session["pending_questions"] = [q.model_dump() for q in questions]
+        if interactive:
+            session["pending_questions"] = [q.model_dump() for q in questions]
         session["budget_spent"] = obj.question_budget.spent
         await self.store.put_session(session)
 
         return TurnResult(draft=obj, questions=questions,
-                          confirm_unlocked=confirm_unlocked, degraded=degraded)
+                          confirm_unlocked=confirm_unlocked, degraded=degraded,
+                          revised=revised)

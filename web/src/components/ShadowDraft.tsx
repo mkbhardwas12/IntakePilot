@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Provenance, RequirementObject, Slot, SlotSchemaEntry } from "../types";
 import { formatValue } from "../format";
 import { backendContextOf } from "./SystemContext";
@@ -16,10 +17,13 @@ interface ShadowDraftProps {
   schema: Record<string, SlotSchemaEntry> | null;
   changedKeys: Set<string>;
   confirmUnlocked: boolean;
+  /** Pre-confirm: filled slots can be revised in place. */
+  editable?: boolean;
+  onRevise?: (key: string, value: string) => void;
   onConfirm: () => void;
 }
 
-export function ShadowDraft({ draft, schema, changedKeys, confirmUnlocked, onConfirm }: ShadowDraftProps) {
+export function ShadowDraft({ draft, schema, changedKeys, confirmUnlocked, editable, onRevise, onConfirm }: ShadowDraftProps) {
   // Union: request-type schema forks (E) can add slots beyond the default
   // schema the page loaded — anything present in the draft must render.
   const slotKeys = Array.from(new Set([
@@ -64,6 +68,8 @@ export function ShadowDraft({ draft, schema, changedKeys, confirmUnlocked, onCon
               entry={entry}
               slot={slot}
               changed={changedKeys.has(key)}
+              editable={!!editable}
+              onRevise={onRevise}
             />
           );
         })}
@@ -92,17 +98,32 @@ function SlotRow({
   slotKey,
   entry,
   slot,
-  changed
+  changed,
+  editable,
+  onRevise
 }: {
   slotKey: string;
   entry: SlotSchemaEntry | undefined;
   slot: Slot | undefined;
   changed: boolean;
+  editable: boolean;
+  onRevise?: (key: string, value: string) => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState("");
   const label = entry?.label ?? slotKey.replace(/_/g, " ");
   const value = slot ? displayValue(slotKey, slot) : null;
   const provenance = slot?.provenance ?? null;
   const confidence = slot?.confidence ?? 0;
+  // backend_context is structured discovery data — not hand-editable.
+  const canEdit =
+    editable && !!onRevise && !!slot && slot.value !== null && slotKey !== "backend_context";
+
+  const beginEdit = () => {
+    const v = slot?.value;
+    setText(Array.isArray(v) ? v.map(String).join(", ") : String(v ?? ""));
+    setEditing(true);
+  };
 
   return (
     <div className={changed ? "slot-row changed" : "slot-row"}>
@@ -119,14 +140,58 @@ function SlotRow({
             </span>
           )}
         </span>
-        {provenance && (
-          <span className={`prov-badge prov-${provenance}`}>
-            <span className="prov-dot" />
-            {PROVENANCE_LABEL[provenance]}
-          </span>
-        )}
+        <span className="slot-row-actions">
+          {canEdit && !editing && (
+            <button
+              type="button"
+              className="slot-edit-btn"
+              title={`Revise ${label}`}
+              aria-label={`Revise ${label}`}
+              onClick={beginEdit}
+            >
+              <svg viewBox="0 0 14 14" width="11" height="11" aria-hidden="true">
+                <path
+                  d="M9.9 1.6 12.4 4.1 5 11.5 2 12l.5-3z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          )}
+          {provenance && (
+            <span className={`prov-badge prov-${provenance}`}>
+              <span className="prov-dot" />
+              {PROVENANCE_LABEL[provenance]}
+            </span>
+          )}
+        </span>
       </div>
-      <div className={value === null ? "slot-value empty" : "slot-value"}>{value ?? "—"}</div>
+      {editing ? (
+        <form
+          className="slot-edit-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setEditing(false);
+            if (onRevise) onRevise(slotKey, text);
+          }}
+        >
+          <input
+            autoFocus
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setEditing(false);
+            }}
+            aria-label={`New value for ${label}`}
+          />
+          <button type="submit" disabled={text.trim() === ""}>Save</button>
+          <button type="button" onClick={() => setEditing(false)}>Cancel</button>
+        </form>
+      ) : (
+        <div className={value === null ? "slot-value empty" : "slot-value"}>{value ?? "—"}</div>
+      )}
       <div className="confidence-track">
         <div
           className={`confidence-fill${provenance ? ` conf-${provenance}` : ""}`}

@@ -27,6 +27,10 @@ class CreateSessionBody(BaseModel):
 class TurnBody(BaseModel):
     message: str = ""
     answers: list[dict] = []
+    # Mid-session revisions from the Shadow Draft panel: {slot_key: value}.
+    # Applied deterministically with EDITED provenance; extraction can never
+    # overwrite them, and correcting a machine-filled slot feeds learning.
+    revisions: dict = {}
 
 
 def _ctx(request: Request):
@@ -65,7 +69,8 @@ async def _run_turn(ctx, session: dict, body: TurnBody, emit=None) -> TurnResult
         session["turns"].append({"role": "user", "text": body.message, "at": now})
 
     result = await ctx.orchestrator.handle_turn(session, body.message,
-                                                body.answers, emit=emit)
+                                                body.answers, emit=emit,
+                                                revisions=body.revisions)
     summary = _assistant_summary(result)
     session["turns"].append({"role": "assistant", "text": summary,
                              "at": datetime.now(timezone.utc).isoformat()})
@@ -77,6 +82,8 @@ def _assistant_summary(result: TurnResult) -> str:
     parts = []
     if result.degraded:
         parts.append("I couldn't fully process that message, so I kept the draft as it was.")
+    if result.revised:
+        parts.append(f"Updated {result.revised} field(s) you revised.")
     filled = sum(1 for s in result.draft.slots.values() if s.value not in (None, "", []))
     parts.append(f"Draft updated — {filled} slot(s) filled, "
                  f"readiness {result.draft.readiness_score}.")

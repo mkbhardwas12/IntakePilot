@@ -41,12 +41,24 @@ def _extract_slots(message: str) -> dict:
         r"(?:our|the|my)?\s*([\w\s\-]+?)\s+takes\s+(?:about\s+|around\s+)?([\d.]+\s*\w+)\s+to\s+(\w+)",
         low)
     manual = bool(re.search(r"\b(by hand|manual|manually|hand-compiled|copy.?past)\b", low))
+    # capability-failure / regression — "(after the changes) I am not able to X"
+    problem = re.search(
+        r"\b(?:not able to|unable to|can(?:no|')t|can not|no longer(?:\s+able to)?)\s+"
+        r"(.+?)(?:\.|,|;| because\b| since\b|$)", low)
     if m:
         subject, duration, verb = m.group(1).strip(), m.group(2).strip(), m.group(3)
         how = " by hand" if manual else ""
         slots["business_outcome"] = {
             "value": f"Automate the {subject} — currently {duration} to {verb}{how}",
             "confidence": 0.85}
+    elif problem:
+        capability = problem.group(1).strip()
+        slots["business_outcome"] = {
+            "value": f"Restore ability to {capability}", "confidence": 0.75}
+        # bug_report fork slots; extract() drops them for other schemas.
+        slots["current_behavior"] = {"value": text.rstrip("."), "confidence": 0.7}
+        slots["expected_behavior"] = {
+            "value": f"Able to {capability} again", "confidence": 0.7}
     elif manual:
         slots["business_outcome"] = {
             "value": f"Automate a manual process: {text.rstrip('.')}",

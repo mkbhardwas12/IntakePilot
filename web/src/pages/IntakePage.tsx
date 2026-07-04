@@ -21,6 +21,11 @@ export function IntakePage() {
   const [draft, setDraft] = useState<RequirementObject | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [answered, setAnswered] = useState<Record<string, string>>({});
+  // Answers collected for the current question set but not yet sent: one
+  // turn carries the whole batch, so unanswered questions aren't logged
+  // "skipped" and re-asked (double-spending budget) after every single chip.
+  const [pendingAnswers, setPendingAnswers] = useState<TurnAnswer[]>([]);
+  const [currentQuestions, setCurrentQuestions] = useState<Question[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [stage, setStage] = useState<TurnStage | null>(null);
   const [confirmUnlocked, setConfirmUnlocked] = useState(false);
@@ -59,6 +64,8 @@ export function IntakePage() {
     setDraft(null);
     setMessages([]);
     setAnswered({});
+    setPendingAnswers([]);
+    setCurrentQuestions([]);
     setStreaming(false);
     setStage(null);
     setConfirmUnlocked(false);
@@ -102,13 +109,18 @@ export function IntakePage() {
   const sendMessage = useCallback(
     async (text: string, answers?: TurnAnswer[]) => {
       if (!sessionId || streaming) return;
+      // Free-text sends carry any answers collected so far, so a partial
+      // question set is never silently dropped (and never logged skipped
+      // prematurely by an eager per-chip turn).
+      const batch = answers ?? (pendingAnswers.length > 0 ? pendingAnswers : undefined);
+      setPendingAnswers([]);
       pushMessage({ role: "user", text });
       setStreaming(true);
       setStage("extracting");
       try {
         const result = await sendTurn(
           sessionId,
-          { message: text, ...(answers && answers.length > 0 ? { answers } : {}) },
+          { message: text, ...(batch && batch.length > 0 ? { answers: batch } : {}) },
           {
             onStatus: (s) => setStage(s),
             onSlot: (key, slot) => {
@@ -132,6 +144,7 @@ export function IntakePage() {
           return result.draft;
         });
         setConfirmUnlocked(result.confirm_unlocked);
+        setCurrentQuestions(result.questions);
         const assistantText =
           result.questions.length > 0
             ? "I need a few details to finish the draft."
@@ -151,15 +164,63 @@ export function IntakePage() {
         setStage(null);
       }
     },
-    [sessionId, streaming, pushMessage, pulseSlot, toast]
+    [sessionId, streaming, pendingAnswers, pushMessage, pulseSlot, toast]
   );
 
   const answerQuestion = useCallback(
     (question: Question, value: string) => {
       setAnswered((prev) => ({ ...prev, [question.id]: value }));
-      void sendMessage(value, [{ question_id: question.id, slot_key: question.slot_key, value }]);
+      const next = [
+        ...pendingAnswers.filter((a) => a.question_id !== question.id),
+        { question_id: question.id, slot_key: question.slot_key, value }
+      ];
+      // Whole set answered → send one batched turn; otherwise keep collecting.
+      if (currentQuestions.length > 0 && next.length >= currentQuestions.length) {
+        void sendMessage(next.map((a) => String(a.value)).join(" · "), next);
+      } else {
+        setPendingAnswers(next);
+      }
     },
-    [sendMessage]
+    [pendingAnswers, currentQuestions, sendMessage]
+  );
+
+  const sendPendingAnswers = useCallback(() => {
+    if (pendingAnswers.length === 0) return;
+    void sendMessage(pendingAnswers.map((a) => String(a.value)).join(" · "), pendingAnswers);
+  }, [pendingAnswers, sendMessage]);
+
+  /** Mid-session revision from the Shadow Draft: a silent turn — no chat
+   * bubbles, pending questions untouched — that rewrites one slot with
+   * EDITED provenance. */
+  const reviseSlot = useCallback(
+    async (key: string, value: string) => {
+      if (!sessionId || streaming) return;
+      setStreaming(true);
+      try {
+        const result = await sendTurn(
+          sessionId,
+          { message: "", revisions: { [key]: value } },
+          {
+            onSlot: (k, slot) => {
+              setDraft((d) => (d ? { ...d, slots: { ...d.slots, [k]: slot } } : d));
+              pulseSlot(k);
+            },
+            onReadiness: (score) => {
+              setDraft((d) => (d ? { ...d, readiness_score: score } : d));
+            }
+          }
+        );
+        setDraft(result.draft);
+        setConfirmUnlocked(result.confirm_unlocked);
+        const label = schema?.[key]?.label ?? key.replace(/_/g, " ");
+        toast(`${label} updated.`);
+      } catch (err: unknown) {
+        toast(`Update failed: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        setStreaming(false);
+      }
+    },
+    [sessionId, streaming, schema, pulseSlot, toast]
   );
 
   const handleConfirmed = useCallback((resp: ConfirmResponse) => {
@@ -181,14 +242,18 @@ export function IntakePage() {
         budget={draft?.question_budget ?? null}
         answered={answered}
         disabled={!sessionId}
+        pendingCount={pendingAnswers.length}
         onSend={(text) => void sendMessage(text)}
         onAnswer={answerQuestion}
+        onSendAnswers={sendPendingAnswers}
       />
       <ShadowDraft
         draft={draft}
         schema={schema}
         changedKeys={changedKeys}
         confirmUnlocked={confirmUnlocked}
+        editable={!!draft && !streaming && ["draft", "questioning", "awaiting_confirmation"].includes(draft.status)}
+        onRevise={(key, value) => void reviseSlot(key, value)}
         onConfirm={() => setView("confirm")}
       />
       {view === "confirm" && draft && sessionId && (

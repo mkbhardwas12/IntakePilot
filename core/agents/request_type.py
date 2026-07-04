@@ -13,7 +13,13 @@ import re
 # about a report, not a request for a new one).
 TYPE_KEYWORDS: dict[str, list[str]] = {
     "bug_report": ["error", "broken", "fail", "crash", "wrong", "incorrect",
-                   "bug", "stopped", "not working", "doesn't work", "defect"],
+                   "bug", "stopped", "not working", "doesn't work", "defect",
+                   # capability-failure / regression phrasings: "after last
+                   # week of changes I am not able to …" is a bug report even
+                   # though it never says "bug".
+                   "not able", "unable", "can't", "cannot", "can not",
+                   "no longer", "used to work", "regression",
+                   "does not work", "isn't working"],
     "data_request": ["report", "dashboard", "export", "extract", "metric",
                      "kpi", "list of", "numbers", "figures", "data"],
     "new_capability": ["automate", "build", "create", "integrate", "workflow",
