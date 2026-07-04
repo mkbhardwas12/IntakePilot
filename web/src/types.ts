@@ -23,6 +23,10 @@ export interface BackendEntity {
 export interface BackendContext { systems: string[]; entities: BackendEntity[]; discovered_at?: string; }
 export interface TurnResult { draft: RequirementObject; questions: Question[]; confirm_unlocked: boolean; degraded: boolean; }
 export interface SlotSchemaEntry { required: boolean; askable: boolean; ask_hint?: string; default?: unknown; default_reason?: string; label: string; }
-export interface GateResult { gate: number; name: string; passed: boolean; reason: string | null; suggestion: string | null; }
+export interface GateResult {
+  gate: number; name: string; passed: boolean;
+  reason: string | null; suggestion: string | null;
+  meta?: Record<string, unknown>;
+}
 export interface Ticket { target: string; ref: string; path: string; title: string; }
 export interface ConfirmResponse { draft: RequirementObject; gates: GateResult[]; routing: RoutingDecision; ticket: Ticket | null; }

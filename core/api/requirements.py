@@ -63,6 +63,39 @@ async def get_render(req_id: str, request: Request):
     return {"business": renderer.business_render(obj, ctx.schema)}
 
 
+class AttachBody(BaseModel):
+    target_req_id: str
+
+
+@router.post("/{req_id}/attach")
+async def attach(req_id: str, body: AttachBody, request: Request):
+    """Duplicate-merge: instead of leaving a gate-4-caught requirement parked
+    as GATED, fold it into the existing one. The requirement closes as DONE
+    with an auditable linkage; dedup is where intake earns its keep."""
+    ctx = _ctx(request)
+    await _authorize(ctx, request, req_id)
+    if body.target_req_id == req_id:
+        raise HTTPException(422, "cannot attach a requirement to itself")
+    async with ctx.orchestrator.lock_for(req_id):
+        obj = await _latest(ctx, req_id)
+        if obj.status != Status.GATED:
+            raise HTTPException(409, f"only gated requirements can be attached "
+                                     f"(status is {obj.status.value})")
+        try:
+            await ctx.store.latest(body.target_req_id)
+        except KeyError:
+            raise HTTPException(404, "target requirement not found")
+        obj.version += 1
+        obj.status = Status.DONE
+        obj.touch("attached", f"marked duplicate of {body.target_req_id}")
+        await ctx.store.log("outcome_ledger", {
+            "req_id": req_id, "stage": "attached", "verdict": "duplicate",
+            "detail": {"target_req_id": body.target_req_id}})
+        await ctx.store.put_version(obj)
+        return {"draft": obj.model_dump(mode="json"),
+                "attached_to": body.target_req_id}
+
+
 class ConfirmBody(BaseModel):
     edits: dict = {}
     confirmed_by: str | None = None

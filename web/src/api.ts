@@ -109,6 +109,21 @@ export function getMetrics(): Promise<MetricsResponse> {
   return fetch("/api/metrics").then((r) => toJson<MetricsResponse>(r));
 }
 
+export interface AttachResponse { draft: RequirementObject; attached_to: string; }
+
+/** Duplicate-merge: close this (gated) requirement as a duplicate of target. */
+export function attachRequirement(
+  reqId: string,
+  sessionId: string,
+  targetReqId: string
+): Promise<AttachResponse> {
+  return fetch(`/api/requirements/${reqId}/attach`, {
+    method: "POST",
+    headers: { ...jsonHeaders, ...ownerHeaders(sessionId) },
+    body: JSON.stringify({ target_req_id: targetReqId })
+  }).then((r) => toJson<AttachResponse>(r));
+}
+
 /** Parse one SSE frame into { event, data } (data lines concatenated). */
 function parseFrame(frame: string): { event: string; data: string } {
   let event = "message";

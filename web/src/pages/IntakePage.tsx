@@ -168,8 +168,8 @@ export function IntakePage() {
     setView("done");
   }, []);
 
-  if (view === "done" && confirmResult) {
-    return <PostConfirm result={confirmResult} onRestart={initSession} />;
+  if (view === "done" && confirmResult && sessionId) {
+    return <PostConfirm result={confirmResult} sessionId={sessionId} onRestart={initSession} />;
   }
 
   return (
