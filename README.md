@@ -155,7 +155,17 @@ Implemented and verified (spec milestones 1–5 core, plus gates/routing from 6)
   `examples/demo-repo/` (a GitHub target exists in code but is not yet
   wired into config — see PROJECT-REVIEW.md)
 - `/api/metrics` computing Section 9 metrics from the ledgers (plus
-  system-KB counts)
+  system-KB counts, escalation rate, duplicate catch rate, and routing
+  accuracy from reroute ground truth)
+- The learning & feedback surface: gate 4 checks real known work (vector
+  candidates + deterministic near-duplicate fail) with one-click
+  attach-as-duplicate; routing blends keyword and precedent signals and
+  learns from reroutes (`POST /api/requirements/{id}/reroute`, GitHub
+  webhook); question ranking and readiness weights calibrate from the
+  ledgers; corrections replay as evals (`GET /api/evals/replay`); repeated
+  corrections surface as glossary proposals (`GET /api/glossary/proposals`,
+  human-accepted via `POST /api/glossary`); system-KB validation via
+  `POST /api/kb/{system}/{entity}/validate`
 - ADDENDUM-01 backend-aware enrichment: `SystemConnector` protocol + fixture
   connector, post-confirm enrichment agent, `system_kb` ledger feeding the
   retrieval ladder, System-context section on routed tickets and in the
