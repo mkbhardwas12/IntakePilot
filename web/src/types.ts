@@ -12,6 +12,7 @@ export interface RequirementObject {
   ask_verbatim: string; slots: Record<string, Slot>; question_budget: Budget;
   assumptions: string[]; readiness_score: number;
   confirmation: Confirmation | null; routing: RoutingDecision | null; audit: AuditEvent[];
+  request_type: string;
 }
 export interface Question { id: string; slot_key: string; text: string; because: string; options: string[] | null; }
 export interface BackendCustomization { name: string; type: string; description: string; owner_team: string; kind: string; }

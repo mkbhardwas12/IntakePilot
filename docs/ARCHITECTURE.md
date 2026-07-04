@@ -44,7 +44,7 @@ flowchart LR
 
 ## Repository layout
 
-`core/` — FastAPI app: `api/` (routers), `agents/` (orchestrator, intake, gap analyzer, question composer, enrichment, renderer), `gates/`, `learning/` (exemplars), `providers/` (llm, store, vector, connector), `targets/`, `models.py`, `config.py`. `web/` — React + TypeScript + Vite, SSE streaming UI, semantic-token theming (dark/light). `deploy/` — dev and prod compose files, Dockerfiles, nginx config. `tests/` — invariant, e2e, and enrichment suites (30 tests). `evals/golden/` — golden intake scenarios. `docs/` — build spec, addendum, spec review, design guidelines, deployment, this file.
+`core/` — FastAPI app: `api/` (routers), `agents/` (orchestrator, intake, gap analyzer, question composer, enrichment, renderer), `gates/`, `learning/` (exemplars), `providers/` (llm, store, vector, connector), `targets/`, `models.py`, `config.py`. `web/` — React + TypeScript + Vite, SSE streaming UI, semantic-token theming (dark/light). `deploy/` — dev and prod compose files, Dockerfiles, nginx config. `tests/` — invariant, e2e, enrichment, portfolio, and API suites (100+ tests). `evals/golden/` — golden intake scenarios. `docs/` — build spec, addendum, spec review, design guidelines, deployment, this file.
 
 ## Trust boundaries and current limits
 

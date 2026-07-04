@@ -4,6 +4,4 @@ uvicorn[standard]==0.49.0
 pydantic==2.13.4
 PyYAML==6.0.3
 httpx==0.28.1
-pytest==9.1.1
-pytest-asyncio==1.4.0
 # Optional (Postgres/pgvector path): pip install asyncpg>=0.30

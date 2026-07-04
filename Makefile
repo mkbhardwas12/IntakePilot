@@ -12,7 +12,7 @@ web:
 
 install:
 	@test -d .venv || python3 -m venv .venv
-	.venv/bin/pip install -q -r requirements.txt
+	.venv/bin/pip install -q -r requirements-dev.txt
 	@test -d web/node_modules || (cd web && npm install)
 
 test:

@@ -8,7 +8,11 @@ import type {
 } from "./types";
 
 export interface HealthResponse { status: string; provider: string; store: string; }
-export interface SchemaResponse { slots: Record<string, SlotSchemaEntry>; }
+export interface SchemaResponse {
+  request_type: string;
+  available_types: string[];
+  slots: Record<string, SlotSchemaEntry>;
+}
 export interface SessionCreateResponse { session_id: string; req_id: string; draft: RequirementObject; }
 export interface SessionTurnEntry { role: "user" | "assistant"; text: string; at: string; }
 export interface SessionDetail {
@@ -60,8 +64,8 @@ export function getHealth(): Promise<HealthResponse> {
   return fetch("/health").then((r) => toJson<HealthResponse>(r));
 }
 
-export function getSchema(): Promise<SchemaResponse> {
-  return fetch("/api/schema").then((r) => toJson<SchemaResponse>(r));
+export function getSchema(type = "default"): Promise<SchemaResponse> {
+  return fetch(`/api/schema?type=${encodeURIComponent(type)}`).then((r) => toJson<SchemaResponse>(r));
 }
 
 export function createSession(requester?: { name: string; dept: string; role: string }): Promise<SessionCreateResponse> {

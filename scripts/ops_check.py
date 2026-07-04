@@ -2,11 +2,12 @@
 running IntakePilot API on :8000. Prints PASS/FAIL per check; exits 1 on any FAIL."""
 from __future__ import annotations
 
+import os
 import sys
 
 import httpx
 
-BASE = "http://localhost:8000"
+BASE = os.environ.get("INTAKEPILOT_BASE_URL", "http://localhost:8000")
 c = httpx.Client(base_url=BASE, timeout=60)
 results: list[tuple[str, bool, str]] = []
 

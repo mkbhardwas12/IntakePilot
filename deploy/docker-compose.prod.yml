@@ -3,16 +3,13 @@
 # host, an air-gapped network, or any cloud VM.
 #
 #   cd deploy
-#   cp .env.example .env        # set POSTGRES_PASSWORD (and LLM choice)
+#   cp .env.example .env        # set POSTGRES_PASSWORD
 #   docker compose -f docker-compose.prod.yml up -d --build
-#
-# With the bundled local LLM (Ollama):
-#   docker compose -f docker-compose.prod.yml --profile local-llm up -d --build
 #   docker compose -f docker-compose.prod.yml exec ollama ollama pull llama3.1
 #
 # With an external OpenAI-compatible endpoint (vLLM, LiteLLM, Azure OpenAI,
-# an internal gateway): set INTAKEPILOT_LLM=openai_compat and OPENAI_BASE_URL
-# in .env — no Ollama container needed.
+# an internal gateway): set COMPOSE_PROFILES=, INTAKEPILOT_LLM=openai_compat,
+# and OPENAI_BASE_URL in .env — no Ollama container needed.
 #
 # NOTE: IntakePilot has no built-in authentication yet. Do not expose WEB_PORT
 # to the internet directly — front it with your SSO/reverse proxy (e.g.
