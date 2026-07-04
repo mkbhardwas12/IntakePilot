@@ -166,6 +166,12 @@ Implemented and verified (spec milestones 1–5 core, plus gates/routing from 6)
   radius (`budget.dynamic`), and a generic chat-channel adapter
   (`POST /api/channels/inbound`) any Slack/Teams bot can call — numbered
   answers and a 'confirm' keyword complete the whole flow in chat
+- The portfolio layer: collision detection (open requirements touching the
+  same backend entities are connected at confirm — ticket Impact section,
+  `GET /api/graph` with hotspots), deterministic cost-of-delay pricing on
+  every ticket (`cost_of_delay` slot + backlog-by-value in metrics),
+  generated Given/When/Then acceptance criteria on routed tickets, and a
+  stakeholder countersign ledger (`/api/requirements/{id}/consent`)
 - The learning & feedback surface: gate 4 checks real known work (vector
   candidates + deterministic near-duplicate fail) with one-click
   attach-as-duplicate; routing blends keyword and precedent signals and
