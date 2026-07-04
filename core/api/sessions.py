@@ -21,7 +21,9 @@ _bg_turns: set[asyncio.Task] = set()
 
 
 class CreateSessionBody(BaseModel):
-    requester: dict | None = None
+    # Typed at the boundary: a malformed requester (e.g. numeric name) is a
+    # 422 from FastAPI, not a 500 from a pydantic error inside the handler.
+    requester: Requester | None = None
 
 
 class TurnBody(BaseModel):
@@ -40,8 +42,8 @@ def _ctx(request: Request):
 @router.post("")
 async def create_session(body: CreateSessionBody, request: Request):
     ctx = _ctx(request)
-    req = Requester(**(body.requester or {})) if body.requester else Requester()
-    if body.requester and "id" not in body.requester:
+    req = body.requester or Requester()
+    if body.requester is not None and "id" not in body.requester.model_fields_set:
         req.id = uuid.uuid4().hex[:8]
     session, obj = await ctx.start_session(req)
     return {"session_id": session["session_id"], "req_id": session["req_id"],
