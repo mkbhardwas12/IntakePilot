@@ -1,40 +1,47 @@
 # LinkedIn Post
 
-*(Attach `docs/assets/workflow-social.png` FIRST — it's the mobile-friendly version with large type. Add `docs/assets/architecture.png` second for the architecture view; the detailed engineering sheet `workflow.png` stays in the repo/Medium. Paste the text below as-is; LinkedIn keeps the line breaks. Add the GitHub + Medium links before posting.)*
+*(Attach `docs/assets/workflow-social.png` FIRST — the mobile-friendly version — and `docs/assets/architecture.png` second. The detailed engineering sheet `workflow.png` stays in the repo/Medium. Paste the text below as-is; it is ~2,500 characters, under LinkedIn's 3,000 limit. Add the GitHub + Medium links before posting.)*
 
 ---
 
-I've spent most of my career in enterprise IT, a lot of it around SAP. Looking back at the projects that failed or slipped, almost none died because of technology. They died at the requirement. The BRD came late, or said one thing and meant another, or three teams read it three different ways. Nobody shared the same picture, so the gap surfaced months later in UAT, where it costs the most.
+I've spent most of my career in enterprise IT, a lot of it around SAP. Looking back at the projects that slipped or failed, almost none died because the technology wasn't good enough. They died earlier: at the requirement.
 
-We gave delivery Jira and code Git. The step everything depends on, where a business need becomes a requirement, still runs on a Word template and follow-up calls.
+A BRD came late. A ticket said one thing and meant another. Three teams read the same ask three different ways. The gap surfaced in UAT, where it costs the most.
 
-At some point I stopped complaining and built something about it, on nights and weekends. It's called IntakePilot and it's open source. The numbers below are from its shipped demo, reproducible in about five minutes with "make dev". No cloud account, no model download.
+So on nights and weekends I built IntakePilot, and open-sourced it.
 
-A Finance Ops analyst types one sentence: "our monthly vendor report takes 3 days to compile by hand."
+It turns a plain-language business ask into a structured, quality-gated, correctly routed, code-ready requirement. Local-first: your model, your data, your network boundary.
 
-Before asking her anything, the system drafts the requirement live. Outcome extracted from her words at 0.85 confidence, stakeholders inferred from her department, affected systems pulled from the org glossary, data sensitivity assumed as "internal, override at confirm". Readiness: 34.
+Demo example: "our monthly vendor report takes 3 days to compile by hand."
 
-Then it asks 2 questions, with reasons, against a budget that lives in Python code rather than a prompt. There's a test where a malicious model tries to ask more and can't. Two taps: readiness 83, confirm unlocks. She fixes one system the glossary missed. Five quality gates run, and the router explains itself in writing: 'Matched 1 signal for "data-platform": "report".'
+Before asking anything, it drafts the requirement live:
+- outcome extracted from the ask
+- stakeholders inferred from context
+- affected systems pulled from the org glossary
+- every assumption declared, readiness scored
 
-The ticket keeps her original ask word for word, tags every claim with provenance and confidence, and declares every assumption. Her one-field fix becomes a training example for the next intake. The learning sits in ledgers, not fine-tuned weights, so you can swap models and keep every lesson.
+Then it asks only the missing business questions. The budget is enforced in Python, not in a prompt. There's a test where a malicious model tries to ask more; the orchestrator refuses.
 
-Business users never get technical questions. After confirmation the system discovers backend context on its own. In the SAP demo, "order info" resolves to VBAK/VBAP plus a custom Z-field (ZZ_PRIORITY_CODE) with its owning team.
+After confirmation, five gates run: schema, INVEST, ambiguity, duplicate detection against real history, routing sanity. The route is explained in writing. The ticket keeps the original ask word for word, with provenance and confidence on every claim.
 
-From there: an optional BA pass, functional review, then your PM tool. Local repo or GitHub issues today, Jira/ADO next via the same one-class protocol. AI coding agents are only as good as the ticket that feeds them. This makes that ticket.
+Business users are never asked about SAP tables or backend columns. Enrichment resolves that after confirmation. In the demo, "order info" maps to VBAK/VBAP and a custom Z-field with its owning team.
 
-The feedback loops are live, not planned. Duplicates get caught against real history and attached with one click. A relabeled ticket teaches the router it picked the wrong queue. Corrections replay as an eval suite that scores extraction accuracy on your own data. Intake also runs inside Slack or Teams through a single endpoint: answer by number, type "confirm", done. 100+ tests pin the invariants.
+The learning lives in ledgers, not model weights:
+- corrections become prompt exemplars
+- reroutes become routing precedent
+- duplicates get attached, not rebuilt
+- repeated edits become glossary proposals
+- correction replay shows whether accuracy is actually improving
 
-Two things I didn't compromise on.
+The design rule underneath: the LLM proposes, deterministic code decides.
 
-1. The LLM is a component, never in control. Deterministic code owns budgets, merges, gates and routing, and adversarial tests prove it.
+Local repo and GitHub issues work today. Jira/ADO and the builder-agent scaffold are roadmap, through the same target protocol. Runs on a laptop, air-gapped on-prem, or any cloud, with a local model, a cloud model, or a hybrid of both.
 
-2. Your model, your choice, including hybrid. Is a local LLM smart enough to understand the business? On day one, maybe not. So a stronger model (cloud or a bigger internal one) answers only the hard turns where the local model's output fails validation, and every correction makes the local model better on your business until those escalations mostly stop. Your processes are core IP. Nothing leaves your network unless you decide it should.
-
-The drawings attached are the whole system: the workflow every role shares, and the architecture that makes it run anywhere — laptop, air-gapped data center, any cloud. (Detailed engineering sheets are in the repo.)
+The attached drawings show the workflow and the architecture.
 
 Code + drawings: [GitHub link]
 Longer write-up: [Medium link]
 
-What would make this useful for your intake process? Asking because I want to build the next piece against real needs.
+What would make this useful for your intake process?
 
 #EnterpriseAI #SAP #S4HANA #RequirementsEngineering #LocalLLM #OpenSource
