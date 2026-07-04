@@ -27,9 +27,11 @@ CREATE TABLE IF NOT EXISTS edit_diffs (
   id BIGSERIAL PRIMARY KEY,
   req_id TEXT, version INT, slot_key TEXT,
   proposed JSONB, corrected JSONB,
+  provenance TEXT,
   context_bucket TEXT,
   ask_embedding JSONB,
   created_at TIMESTAMPTZ DEFAULT now());
+ALTER TABLE edit_diffs ADD COLUMN IF NOT EXISTS provenance TEXT;
 
 CREATE TABLE IF NOT EXISTS question_ledger (
   id BIGSERIAL PRIMARY KEY, req_id TEXT, slot_key TEXT,
@@ -57,7 +59,7 @@ CREATE TABLE IF NOT EXISTS seq (year INT PRIMARY KEY, n INT);
 
 LEDGER_COLS = {
     "edit_diffs": ["req_id", "version", "slot_key", "proposed", "corrected",
-                   "context_bucket", "ask_embedding"],
+                   "provenance", "context_bucket", "ask_embedding"],
     "question_ledger": ["req_id", "slot_key", "question", "outcome",
                         "changed_routing", "changed_slots"],
     "outcome_ledger": ["req_id", "stage", "verdict", "detail"],

@@ -35,10 +35,42 @@ PROVENANCE_WEIGHTS = {
     Provenance.INFERRED: 0.75, Provenance.ASSUMED: 0.6,
 }
 
+# Calibration: how strongly the edit ledger can discount a provenance weight,
+# and the Laplace-style smoothing on the confirm denominator.
+CALIBRATION_MAX_DISCOUNT = 0.5   # a weight never drops below half its base
+CALIBRATION_SMOOTHING = 2        # pseudo-confirmations
+
 SKIP_VALUES = {"skip", "don't know", "dont know", "not sure", "unknown"}
 
 
-def readiness(obj: RequirementObject, schema: SlotSchema) -> int:
+async def calibrated_weights(store, bucket: str) -> dict[Provenance, float]:
+    """Per-bucket provenance weights, learned from edit_diffs: if humans in
+    this context routinely correct slots of a given provenance at
+    confirmation, that provenance contributes less to readiness. Only
+    human-originated signals feed this (spec Section 11); with an empty
+    ledger the base weights are returned unchanged."""
+    confirms = sum(
+        1 for r in await store.query_ledger("outcome_ledger", stage="confirmed")
+        if (r.get("detail") or {}).get("bucket") == bucket)
+    counts: dict[str, int] = {}
+    for row in await store.query_ledger("edit_diffs", context_bucket=bucket):
+        prov = row.get("provenance")
+        if prov:
+            counts[prov] = counts.get(prov, 0) + 1
+    weights = dict(PROVENANCE_WEIGHTS)
+    for prov in weights:
+        edited = counts.get(prov.value, 0)
+        if not edited:
+            continue
+        rate = min(1.0, edited / (confirms + CALIBRATION_SMOOTHING))
+        weights[prov] = round(weights[prov] * (1 - CALIBRATION_MAX_DISCOUNT * rate), 4)
+    return weights
+
+
+def readiness(obj: RequirementObject, schema: SlotSchema,
+              weights: dict[Provenance, float] | None = None) -> int:
+    weights = weights or PROVENANCE_WEIGHTS
+
     def coverage(keys: list[str]) -> float:
         if not keys:
             return 1.0
@@ -47,7 +79,7 @@ def readiness(obj: RequirementObject, schema: SlotSchema) -> int:
             slot = obj.slots.get(key)
             if slot is None or slot.value in (None, "", []):
                 continue
-            weight = PROVENANCE_WEIGHTS.get(slot.provenance, 0.6)
+            weight = weights.get(slot.provenance, 0.6)
             total += 0.7 + 0.3 * weight * max(0.0, min(1.0, slot.confidence))
         return total / len(keys)
 
@@ -204,7 +236,9 @@ class Orchestrator:
 
         # 5. READINESS + RENDER + PERSIST (append version, stream deltas)
         await send("status", {"stage": "scoring"})
-        obj.readiness_score = readiness(obj, self.schema)
+        obj.readiness_score = readiness(
+            obj, self.schema,
+            await calibrated_weights(self.store, obj.context_bucket))
         confirm_unlocked = obj.readiness_score >= self.cfg.confirm_threshold
         if questions:
             obj.status = Status.QUESTIONING
