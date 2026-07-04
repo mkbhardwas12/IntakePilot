@@ -1,14 +1,37 @@
 import { useEffect, useState } from "react";
+import { attachRequirement } from "../api";
 import type { ConfirmResponse } from "../types";
 import { percent } from "../format";
+import { useToast } from "../toast";
 import { SystemContextCard, backendContextOf } from "./SystemContext";
 
 const GATE_STEP_MS = 550;
 
-export function PostConfirm({ result, onRestart }: { result: ConfirmResponse; onRestart: () => void }) {
+export function PostConfirm({ result, sessionId, onRestart }:
+  { result: ConfirmResponse; sessionId: string; onRestart: () => void }) {
+  const toast = useToast();
   const gates = result.gates;
   const [litCount, setLitCount] = useState(0);
+  const [attachedTo, setAttachedTo] = useState<string | null>(null);
+  const [attaching, setAttaching] = useState(false);
   const allLit = litCount >= gates.length;
+
+  // Gate 4 hands us the duplicate's id in structured form: offer the merge.
+  const duplicateOf = gates.find((g) => g.gate === 4 && !g.passed)?.meta
+    ?.duplicate_of as string | undefined;
+
+  const attach = async () => {
+    if (!duplicateOf) return;
+    setAttaching(true);
+    try {
+      const resp = await attachRequirement(result.draft.req_id, sessionId, duplicateOf);
+      setAttachedTo(resp.attached_to);
+    } catch (err: unknown) {
+      toast(`Attach failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setAttaching(false);
+    }
+  };
 
   useEffect(() => {
     setLitCount(0);
@@ -60,6 +83,19 @@ export function PostConfirm({ result, onRestart }: { result: ConfirmResponse; on
               {g.suggestion && <span className="gate-failure-suggestion">Suggestion: {g.suggestion}</span>}
             </div>
           ))}
+          {duplicateOf && result.draft.status === "gated" && !attachedTo && (
+            <button className="confirm-btn" disabled={attaching} onClick={() => void attach()}>
+              {attaching ? "Attaching…" : `Attach to ${duplicateOf} (mark as duplicate)`}
+            </button>
+          )}
+          {attachedTo && (
+            <div className="gate-failure">
+              <span className="gate-failure-title">Attached to {attachedTo} ✓</span>
+              <span className="gate-failure-suggestion">
+                This intake is closed as a duplicate; the existing requirement carries the work.
+              </span>
+            </div>
+          )}
         </div>
       )}
 

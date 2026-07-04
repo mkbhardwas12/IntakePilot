@@ -123,6 +123,10 @@ class GateResult(BaseModel):
     passed: bool
     reason: str | None = None
     suggestion: str | None = None
+    # Structured, machine-readable context (e.g. gate 4 sets duplicate_of +
+    # similarity so the UI can offer "attach to existing" instead of parsing
+    # the reason string).
+    meta: dict = {}
 
 
 class Ticket(BaseModel):

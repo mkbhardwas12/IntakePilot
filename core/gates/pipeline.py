@@ -129,7 +129,8 @@ async def gate4_conflict(llm, obj: RequirementObject, vector=None) -> GateResult
             gate=4, name=GATE_NAMES[4], passed=False,
             reason=(f"near-duplicate of {dup_id} "
                     f"(similarity {top.score:.2f}): “{top.text[:100]}”"),
-            suggestion=f"review {dup_id} and attach to it, or reword to distinguish")
+            suggestion=f"review {dup_id} and attach to it, or reword to distinguish",
+            meta={"duplicate_of": dup_id, "similarity": round(top.score, 3)})
     if candidates:
         lines = "\n".join(
             f"- {h.meta.get('req_id', h.id)} (similarity {h.score:.2f}): {h.text[:140]}"
