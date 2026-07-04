@@ -191,9 +191,10 @@ export function IntakePage() {
         confirmUnlocked={confirmUnlocked}
         onConfirm={() => setView("confirm")}
       />
-      {view === "confirm" && draft && (
+      {view === "confirm" && draft && sessionId && (
         <ConfirmView
           draft={draft}
+          sessionId={sessionId}
           schema={schema}
           onCancel={() => setView("intake")}
           onConfirmed={handleConfirmed}

@@ -67,7 +67,10 @@ SID=$(curl -s -X POST localhost:8000/api/sessions -H 'content-type: application/
 curl -s -X POST "localhost:8000/api/sessions/$SID/turns?stream=false" \
   -H 'content-type: application/json' \
   -d '{"message":"our monthly vendor report takes 3 days to compile by hand"}'
-# ... answer the returned questions, then POST /api/requirements/{req_id}/confirm
+# ... answer the returned questions, then confirm. Requirements are bound to
+# the session that created them (IDs are sequential, so this stops enumeration):
+#   curl -X POST localhost:8000/api/requirements/{req_id}/confirm \
+#     -H "X-Session-Id: $SID" -H 'content-type: application/json' -d '{"edits":{}}'
 ```
 
 ## Architecture in one paragraph

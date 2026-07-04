@@ -264,7 +264,8 @@ async def test_acceptance_goods_report_ticket_shows_undisclosed_z_field(client):
                       json={"message": "", "answers": answers})
 
     confirm = (await client.post(f"/api/requirements/{req_id}/confirm",
-                                 json={"confirmed_by": "Pat"})).json()
+                                 json={"confirmed_by": "Pat"},
+                                 headers={"X-Session-Id": sid})).json()
     assert confirm["draft"]["status"] == "routed"
     assert all(g["passed"] for g in confirm["gates"])
 

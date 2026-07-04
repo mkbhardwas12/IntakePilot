@@ -7,12 +7,13 @@ import { SystemContextCard, backendContextOf } from "./SystemContext";
 
 interface ConfirmViewProps {
   draft: RequirementObject;
+  sessionId: string;
   schema: Record<string, SlotSchemaEntry> | null;
   onCancel: () => void;
   onConfirmed: (resp: ConfirmResponse) => void;
 }
 
-export function ConfirmView({ draft, schema, onCancel, onConfirmed }: ConfirmViewProps) {
+export function ConfirmView({ draft, sessionId, schema, onCancel, onConfirmed }: ConfirmViewProps) {
   const toast = useToast();
   const [rendered, setRendered] = useState<string | null>(null);
   const [renderFailed, setRenderFailed] = useState(false);
@@ -22,7 +23,7 @@ export function ConfirmView({ draft, schema, onCancel, onConfirmed }: ConfirmVie
 
   useEffect(() => {
     let cancelled = false;
-    getRender(draft.req_id)
+    getRender(draft.req_id, sessionId)
       .then((r) => {
         if (!cancelled) setRendered(r.business);
       })
@@ -32,7 +33,7 @@ export function ConfirmView({ draft, schema, onCancel, onConfirmed }: ConfirmVie
     return () => {
       cancelled = true;
     };
-  }, [draft.req_id]);
+  }, [draft.req_id, sessionId]);
 
   // backend_context is structured discovery data — rendered as its own card,
   // not as a free-text editable field.
@@ -54,7 +55,7 @@ export function ConfirmView({ draft, schema, onCancel, onConfirmed }: ConfirmVie
   const submit = async () => {
     setSubmitting(true);
     try {
-      const resp = await confirmRequirement(draft.req_id, changedEdits, "Demo User");
+      const resp = await confirmRequirement(draft.req_id, sessionId, changedEdits, "Demo User");
       onConfirmed(resp);
     } catch (err: unknown) {
       toast(`Confirm failed: ${err instanceof Error ? err.message : String(err)}`);

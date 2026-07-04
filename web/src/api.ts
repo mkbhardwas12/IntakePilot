@@ -71,26 +71,36 @@ export function getSession(sessionId: string): Promise<SessionDetail> {
   return fetch(`/api/sessions/${sessionId}`).then((r) => toJson<SessionDetail>(r));
 }
 
-export function getRequirement(reqId: string): Promise<RequirementObject> {
-  return fetch(`/api/requirements/${reqId}`).then((r) => toJson<RequirementObject>(r));
+/** Requirements are session-bound: the API rejects calls without the
+ * X-Session-Id of the session that created the requirement. */
+function ownerHeaders(sessionId: string): Record<string, string> {
+  return { "X-Session-Id": sessionId };
 }
 
-export function getRequirementHistory(reqId: string): Promise<RequirementObject[]> {
-  return fetch(`/api/requirements/${reqId}/history`).then((r) => toJson<RequirementObject[]>(r));
+export function getRequirement(reqId: string, sessionId: string): Promise<RequirementObject> {
+  return fetch(`/api/requirements/${reqId}`, { headers: ownerHeaders(sessionId) })
+    .then((r) => toJson<RequirementObject>(r));
 }
 
-export function getRender(reqId: string): Promise<RenderResponse> {
-  return fetch(`/api/requirements/${reqId}/render`).then((r) => toJson<RenderResponse>(r));
+export function getRequirementHistory(reqId: string, sessionId: string): Promise<RequirementObject[]> {
+  return fetch(`/api/requirements/${reqId}/history`, { headers: ownerHeaders(sessionId) })
+    .then((r) => toJson<RequirementObject[]>(r));
+}
+
+export function getRender(reqId: string, sessionId: string): Promise<RenderResponse> {
+  return fetch(`/api/requirements/${reqId}/render`, { headers: ownerHeaders(sessionId) })
+    .then((r) => toJson<RenderResponse>(r));
 }
 
 export function confirmRequirement(
   reqId: string,
+  sessionId: string,
   edits: Record<string, unknown>,
   confirmedBy?: string
 ): Promise<ConfirmResponse> {
   return fetch(`/api/requirements/${reqId}/confirm`, {
     method: "POST",
-    headers: jsonHeaders,
+    headers: { ...jsonHeaders, ...ownerHeaders(sessionId) },
     body: JSON.stringify({ edits, ...(confirmedBy ? { confirmed_by: confirmedBy } : {}) })
   }).then((r) => toJson<ConfirmResponse>(r));
 }
