@@ -32,7 +32,7 @@ open http://localhost:3000/loop
 Or run the pieces separately:
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/uvicorn core.api.main:app --port 8000     # backend
 cd web && npm install && npm run dev                # frontend on :3000
 .venv/bin/python -m pytest -q                       # tests
@@ -91,8 +91,8 @@ human edit as an `edit_diffs` row (the learning asset) which
 `core/learning/exemplars.py` injects into future extraction prompts —
 model-agnostic learning. Gates 1/3 are deterministic pure functions; gates
 2/4/5 use the LLM as a scored rubric behind one validate-and-retry wrapper.
-The routing classifier is keyword-based with a confidence and a
-human-readable explanation (embedding-assisted scoring is on the roadmap). `web/` is a React + TypeScript + Vite app that
+The routing classifier blends configured keyword signals with routed
+precedent from the vector index, plus confidence and a human-readable explanation. `web/` is a React + TypeScript + Vite app that
 consumes the SSE turn stream to animate the Shadow Draft live.
 
 ## Backend-aware enrichment and the system knowledge base

@@ -40,14 +40,14 @@ export function TopBar() {
           <svg viewBox="0 0 32 32" width="22" height="22">
             <defs>
               <linearGradient id="logo-g" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stopColor="#0d9488" />
-                <stop offset="1" stopColor="#22d3ee" />
+                <stop offset="0" stopColor="var(--accent)" />
+                <stop offset="1" stopColor="var(--accent-2)" />
               </linearGradient>
             </defs>
             <rect width="32" height="32" rx="8" fill="url(#logo-g)" />
             <path
               d="M10 22 L16 9 L22 22 M12.5 17.5 h7"
-              stroke="#06282c"
+              stroke="var(--accent-contrast)"
               strokeWidth="2.4"
               fill="none"
               strokeLinecap="round"

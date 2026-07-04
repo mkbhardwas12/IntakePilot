@@ -18,6 +18,7 @@ from tests.conftest import memory_config
 ADMIN_PATHS = [
     ("GET", "/api/kb"),
     ("POST", "/api/kb/refresh"),
+    ("GET", "/api/metrics"),
     ("GET", "/api/evals/replay?limit=1"),
     ("GET", "/api/glossary/proposals"),
     ("POST", "/api/glossary"),

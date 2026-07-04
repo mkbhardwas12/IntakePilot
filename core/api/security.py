@@ -2,7 +2,7 @@
 
 `INTAKEPILOT_ADMIN_TOKEN` unset -> the ops endpoints stay open (zero-friction
 demo, the project's documented posture). Set -> every admin/ops surface
-(system-KB, glossary, evals replay, reroute) requires
+(metrics, system-KB, glossary, evals replay, reroute) requires
 `Authorization: Bearer <token>`. Constant-time comparison throughout.
 
 `INTAKEPILOT_WEBHOOK_SECRET` set -> /api/webhooks/github verifies GitHub's

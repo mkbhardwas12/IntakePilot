@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import json
 
+from collections.abc import Callable
+
 from core.config import SlotSchema
 from core.models import Budget, ExtractionError, RequirementObject
 from core.agents import intake, precedent
@@ -33,7 +35,14 @@ def matches(got, expected) -> bool:
     return _norm(got) == _norm(expected)
 
 
-async def replay_corrections(store, vector, llm, schema: SlotSchema,
+SchemaResolver = SlotSchema | Callable[[str], SlotSchema]
+
+
+def _schema_for(resolver: SchemaResolver, request_type: str) -> SlotSchema:
+    return resolver(request_type) if callable(resolver) else resolver
+
+
+async def replay_corrections(store, vector, llm, schema: SchemaResolver,
                              limit: int = 100) -> dict:
     """Replay the most recent `limit` corrections through today's extraction
     stack and score how often it now produces the human-corrected value."""
@@ -50,22 +59,26 @@ async def replay_corrections(store, vector, llm, schema: SlotSchema,
         fresh = RequirementObject(
             req_id=f"EVAL-{row['req_id']}", requester=src.requester,
             ask_verbatim=ask, question_budget=Budget(max=7, per_turn=3))
+        fresh.request_type = src.request_type
         exemplar_text = await exemplars.select_exemplars(
             vector, agent="intake", context=src.context_bucket, ask=ask, k=4)
         hits = await precedent.glossary_scan(store, ask)
         glossary_text = "".join(
             f"- “{h['term']}” maps to {h['maps_to']}\n" for h in hits)
+        active_schema = _schema_for(schema, src.request_type)
         try:
             extraction = await intake.extract(
-                llm, fresh, ask, exemplar_text, schema,
+                llm, fresh, ask, exemplar_text, active_schema,
                 glossary_hits=glossary_text)
         except ExtractionError as exc:
             results.append({"req_id": row["req_id"], "slot_key": row["slot_key"],
+                            "request_type": src.request_type,
                             "matched": False, "error": str(exc)[:120]})
             continue
         got = (extraction.get(row["slot_key"]) or {}).get("value")
         results.append({
             "req_id": row["req_id"],
+            "request_type": src.request_type,
             "slot_key": row["slot_key"],
             "expected": row.get("corrected"),
             "got": got,
@@ -99,7 +112,7 @@ def main() -> None:  # pragma: no cover — thin CLI wrapper
     async def run() -> None:
         ctx = AppContext()
         report = await replay_corrections(ctx.store, ctx.vector, ctx.llm,
-                                          ctx.schema)
+                                          ctx.schema_for)
         print(json.dumps(report, indent=2, default=str))
 
     asyncio.run(run())

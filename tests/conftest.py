@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import tempfile
+from pathlib import Path
+
 import pytest
 
 from core.config import Config, SlotSchema, SlotSpec, load_config, load_slot_schema
@@ -17,6 +20,8 @@ def memory_config() -> Config:
     cfg.vector_provider = "local"
     cfg.store = {"sqlite": {"path": ":memory:"}}
     cfg.vector = {"local": {"path": ":memory:"}}
+    cfg.demo_repo = str(Path(tempfile.mkdtemp(prefix="intakepilot-demo-"))
+                        / "demo-repo")
     return cfg
 
 

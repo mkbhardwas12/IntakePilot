@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 
-router = APIRouter(prefix="/api", tags=["metrics"])
+from core.api.security import require_admin
+
+router = APIRouter(prefix="/api", tags=["metrics"],
+                   dependencies=[Depends(require_admin)])
 
 
 def _routing_accuracy(routed_ids: set, outcome_rows: list[dict]) -> float | None:

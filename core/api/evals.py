@@ -19,4 +19,4 @@ async def replay_endpoint(request: Request,
     `accuracy` trending up over time is the learning loop, measured."""
     ctx = request.app.state.ctx
     return await replay.replay_corrections(ctx.store, ctx.vector, ctx.llm,
-                                           ctx.schema, limit=limit)
+                                           ctx.schema_for, limit=limit)

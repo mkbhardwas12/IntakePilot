@@ -18,6 +18,7 @@ export function IntakePage() {
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [schema, setSchema] = useState<Record<string, SlotSchemaEntry> | null>(null);
+  const [schemaForType, setSchemaForType] = useState<string | null>(null);
   const [draft, setDraft] = useState<RequirementObject | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [answered, setAnswered] = useState<Record<string, string>>({});
@@ -59,9 +60,21 @@ export function IntakePage() {
     );
   }, []);
 
+  const loadSchema = useCallback((type = "default") => {
+    getSchema(type)
+      .then((s) => {
+        setSchema(s.slots);
+        setSchemaForType(type);
+      })
+      .catch((err: unknown) => {
+        toast(`Could not load slot schema: ${err instanceof Error ? err.message : String(err)}`);
+      });
+  }, [toast]);
+
   const initSession = useCallback(() => {
     setSessionId(null);
     setDraft(null);
+    setSchemaForType(null);
     setMessages([]);
     setAnswered({});
     setPendingAnswers([]);
@@ -80,7 +93,8 @@ export function IntakePage() {
       .catch((err: unknown) => {
         toast(`Could not start a session: ${err instanceof Error ? err.message : String(err)}`);
       });
-  }, [toast]);
+    loadSchema("default");
+  }, [loadSchema, toast]);
 
   useEffect(() => {
     // React 18 StrictMode double-invokes mount effects in dev; without the
@@ -88,19 +102,19 @@ export function IntakePage() {
     if (!initedRef.current) {
       initedRef.current = true;
       initSession();
-      getSchema()
-        .then((s) => setSchema(s.slots))
-        .catch((err: unknown) => {
-          toast(`Could not load slot schema: ${err instanceof Error ? err.message : String(err)}`);
-        });
     }
     const timers = pulseTimers.current;
     return () => {
       timers.forEach((t) => window.clearTimeout(t));
       timers.clear();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [initSession]);
+
+  useEffect(() => {
+    if (!draft) return;
+    const desired = draft.request_type || "default";
+    if (desired !== schemaForType) loadSchema(desired);
+  }, [draft?.request_type, schemaForType, loadSchema]);
 
   const pushMessage = useCallback((msg: Omit<ChatMessage, "id">) => {
     setMessages((prev) => [...prev, { ...msg, id: nextMsgId.current++ }]);

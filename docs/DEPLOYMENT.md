@@ -35,8 +35,7 @@ Vite dev server on :3000 proxies to the api container (`INTAKEPILOT_API_URL=http
 cd deploy
 cp .env.example .env         # set POSTGRES_PASSWORD, pick the LLM
 docker compose -f docker-compose.prod.yml up -d --build
-# with the bundled local LLM:
-docker compose -f docker-compose.prod.yml --profile local-llm up -d --build
+# the copied .env starts the bundled local LLM profile by default:
 docker compose -f docker-compose.prod.yml exec ollama ollama pull llama3.1
 ```
 
@@ -45,6 +44,7 @@ What you get versus the dev stack: the web tier is a real build served by nginx 
 **Bring your own LLM.** Any OpenAI-compatible server works — vLLM, LiteLLM, llama.cpp, TGI, Azure OpenAI, or an internal gateway. In `.env`:
 
 ```
+COMPOSE_PROFILES=
 INTAKEPILOT_LLM=openai_compat
 OPENAI_BASE_URL=http://your-gateway:8001/v1
 OPENAI_MODEL=qwen3-32b
@@ -90,4 +90,4 @@ Everything is selectable in `intakepilot.yaml` and overridable by environment:
 
 ## Security checklist before exposing beyond localhost
 
-IntakePilot has **no built-in end-user authentication yet** (see PROJECT-REVIEW.md). Front the web port with your SSO/reverse proxy (oauth2-proxy, Authelia, an ALB/App Gateway with OIDC) or keep it on an internal network; terminate TLS at that proxy. Three switches you should set in `.env`: **`INTAKEPILOT_ADMIN_TOKEN`** — one bearer token that closes every admin/ops surface (system-KB, glossary, evals replay, reroute); **`INTAKEPILOT_WEBHOOK_SECRET`** — enables `X-Hub-Signature-256` verification on the GitHub webhook (same secret in the GitHub webhook settings); and `POSTGRES_PASSWORD`, which is deliberately not baked into any image. Requirements themselves are session-bound (`X-Session-Id`). Keep Postgres unexposed (the prod compose already does) and back up the `pgdata` volume.
+IntakePilot has **no built-in end-user authentication yet** (see PROJECT-REVIEW.md). Front the web port with your SSO/reverse proxy (oauth2-proxy, Authelia, an ALB/App Gateway with OIDC) or keep it on an internal network; terminate TLS at that proxy. Three switches you should set in `.env`: **`INTAKEPILOT_ADMIN_TOKEN`** — one bearer token that closes every admin/ops surface (metrics, system-KB, glossary, evals replay, reroute); **`INTAKEPILOT_WEBHOOK_SECRET`** — enables `X-Hub-Signature-256` verification on the GitHub webhook (same secret in the GitHub webhook settings); and `POSTGRES_PASSWORD`, which is deliberately not baked into any image. Requirements themselves are session-bound (`X-Session-Id`). Keep Postgres unexposed (the prod compose already does) and back up the `pgdata` volume.

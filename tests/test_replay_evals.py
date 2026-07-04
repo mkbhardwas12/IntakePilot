@@ -73,6 +73,30 @@ async def test_replay_scores_miss_when_model_still_gets_it_wrong():
     assert report["total"] == 1 and report["accuracy"] == 0.0
 
 
+async def test_replay_uses_the_source_request_type_schema():
+    store = SqliteStore({"path": ":memory:"})
+    llm = MockLLM({"dim": 16})
+    vector = LocalVectorIndex(llm, {"path": ":memory:"})
+    obj = RequirementObject(
+        req_id="IPR-2026-000002", requester=Requester(dept="Support Ops"),
+        ask_verbatim="the invoice export fails with an error every morning",
+        question_budget=Budget(max=7, per_turn=3))
+    obj.request_type = "bug_report"
+    await store.put_version(obj)
+    await learning.capture_edit(store, vector, obj, "expected_behavior",
+                                None, "Invoice export succeeds",
+                                provenance="assumed")
+
+    fixed = CannedLLM({"expected_behavior": {
+        "value": "Invoice export succeeds", "confidence": 0.9}})
+    report = await replay_corrections(
+        store, vector, fixed,
+        lambda request_type: load_slot_schema(request_type=request_type))
+    assert report["total"] == 1
+    assert report["accuracy"] == 1.0
+    assert report["results"][0]["request_type"] == "bug_report"
+
+
 def test_match_normalization():
     assert matches(["b", "A "], ["a", "B"])
     assert matches(" This Week", "this week")
