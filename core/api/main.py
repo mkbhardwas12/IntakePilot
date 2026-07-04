@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.api.context import AppContext
-from core.api import kb, metrics, requirements, sessions
+from core.api import evals, kb, metrics, requirements, sessions
 
 
 def create_app(ctx: AppContext | None = None) -> FastAPI:
@@ -41,6 +41,7 @@ def create_app(ctx: AppContext | None = None) -> FastAPI:
     app.include_router(requirements.router)
     app.include_router(metrics.router)
     app.include_router(kb.router)
+    app.include_router(evals.router)
     return app
 
 
