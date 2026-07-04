@@ -72,6 +72,11 @@ class Config:
     connectors: dict = field(default_factory=dict)
     budget_max: int = 7
     budget_per_turn: int = 3
+    # F: dynamic budget — opt-in. When enabled, the per-requirement question
+    # budget scales with blast radius between floor and cap (code-enforced).
+    budget_dynamic: bool = False
+    budget_floor: int = 3
+    budget_cap: int = 9
     confirm_threshold: int = 70
     routing_queues: list[dict] = field(default_factory=list)
     demo_repo: str = "examples/demo-repo"
@@ -105,6 +110,9 @@ def load_config(path: Path | None = None) -> Config:
         connectors=raw.get("connectors", {}),
         budget_max=int(raw.get("budget", {}).get("max", 7)),
         budget_per_turn=int(raw.get("budget", {}).get("per_turn", 3)),
+        budget_dynamic=bool(raw.get("budget", {}).get("dynamic", False)),
+        budget_floor=int(raw.get("budget", {}).get("floor", 3)),
+        budget_cap=int(raw.get("budget", {}).get("cap", 9)),
         confirm_threshold=int(raw.get("readiness", {}).get("confirm_threshold", 70)),
         routing_queues=raw.get("routing", {}).get("queues", []),
         demo_repo=raw.get("demo_repo", "examples/demo-repo"),

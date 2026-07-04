@@ -88,6 +88,31 @@ def readiness(obj: RequirementObject, schema: SlotSchema,
     return round(100 * (0.85 * coverage(required) + 0.15 * coverage(optional)))
 
 
+def dynamic_budget_max(obj: RequirementObject, cfg: Config) -> int:
+    """F: budget scales with blast radius — trivial asks earn few questions,
+    cross-system or deadline-driven asks earn more. Enforcement stays in
+    code: the result is clamped to [floor, cap] and never drops below what
+    is already spent (the meter can grow mid-session as systems are
+    discovered, but a shrink can never strand the requirement)."""
+    systems = obj.slots.get("affected_systems")
+    n_systems = (len(systems.value)
+                 if systems and isinstance(systems.value, list) else 0)
+    urgency = obj.slots.get("urgency")
+    urgency_val = str(urgency.value).lower() if urgency and urgency.value else ""
+
+    score = 0  # 0..3
+    if n_systems >= 2:
+        score += 1
+    if n_systems >= 3:
+        score += 1
+    if urgency_val in ("this week", "this month"):
+        score += 1
+
+    span = max(0, cfg.budget_cap - cfg.budget_floor)
+    scaled = cfg.budget_floor + round(span * score / 3)
+    return max(min(scaled, cfg.budget_cap), obj.question_budget.spent)
+
+
 def apply_defaults(obj: RequirementObject, remaining: list[str],
                    schema: SlotSchema) -> RequirementObject:
     """Budget exhausted (or nothing askable) -> assumptions with stated defaults.
@@ -208,6 +233,8 @@ class Orchestrator:
                 await send("slot", {"key": key, "slot": slot.model_dump()})
 
         # 3. QUESTIONS (budget enforced in code, NOT in prompt)
+        if self.cfg.budget_dynamic:
+            obj.question_budget.max = dynamic_budget_max(obj, self.cfg)
         questions: list[Question] = []
         if gaps and obj.question_budget.spent < obj.question_budget.max and not degraded:
             await send("status", {"stage": "composing_questions"})
