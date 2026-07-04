@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from core.models import Budget, RequirementObject, Requester, TurnResult
+from core.agents.request_type import classify_request_type
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
@@ -67,8 +68,12 @@ async def _run_turn(ctx, session: dict, body: TurnBody, emit=None) -> TurnResult
         obj = await ctx.store.latest(session["req_id"])
         if not obj.ask_verbatim and body.message.strip():
             obj.ask_verbatim = body.message.strip()
+            # E: the request type selects the slot-schema fork and the
+            # learning bucket. Deterministic keyword classifier, in code.
+            obj.request_type = classify_request_type(obj.ask_verbatim)
             obj.version += 1
             obj.touch("ask_recorded", "ask_verbatim set from first message")
+            obj.touch("request_type_classified", obj.request_type)
             await ctx.store.put_version(obj)
 
     now = datetime.now(timezone.utc).isoformat()

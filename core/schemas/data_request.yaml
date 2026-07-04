@@ -1,0 +1,59 @@
+# Schema fork for data/reporting asks (E). Same core slots as default.yaml
+# plus the two questions analysts always end up chasing for data work.
+slots:
+  business_outcome:
+    required: true
+    askable: true
+    label: Business outcome
+    ask_hint: "what should be different when this is done?"
+  affected_systems:
+    required: true
+    askable: false          # infer/retrieve only
+    label: Affected systems
+  urgency:
+    required: true
+    askable: true
+    label: Urgency
+    ask_hint: "how soon does this need to be live?"
+    options: [this week, this month, this quarter, no hard deadline]
+  success_criteria:
+    required: true
+    askable: true
+    label: Success criteria
+    ask_hint: "how will you know it worked?"
+  data_fields:
+    required: false
+    askable: true
+    label: Data fields
+    ask_hint: "which fields or columns matter most?"
+  refresh_frequency:
+    required: false
+    askable: true
+    label: Refresh frequency
+    ask_hint: "how often does it need to refresh?"
+    options: [one-time, daily, weekly, monthly]
+    default: monthly
+    default_reason: "most reporting asks are monthly; override at confirm"
+  scope_boundaries:
+    required: false
+    askable: true
+    label: Scope boundaries
+    ask_hint: "anything explicitly out of scope?"
+  data_sensitivity:
+    required: true
+    askable: false
+    label: Data sensitivity
+    default: internal
+    default_reason: "org norm; override at confirm"
+  stakeholders:
+    required: false
+    askable: false          # nemawashi mining
+    label: Stakeholders
+  nfr:
+    required: false
+    askable: false
+    label: Non-functional needs
+  backend_context:
+    required: false
+    askable: false          # ADDENDUM-01: discovered, never asked
+    label: Backend context

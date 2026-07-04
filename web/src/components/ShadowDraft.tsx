@@ -20,7 +20,12 @@ interface ShadowDraftProps {
 }
 
 export function ShadowDraft({ draft, schema, changedKeys, confirmUnlocked, onConfirm }: ShadowDraftProps) {
-  const slotKeys = schema ? Object.keys(schema) : draft ? Object.keys(draft.slots) : [];
+  // Union: request-type schema forks (E) can add slots beyond the default
+  // schema the page loaded — anything present in the draft must render.
+  const slotKeys = Array.from(new Set([
+    ...(schema ? Object.keys(schema) : []),
+    ...(draft ? Object.keys(draft.slots) : [])
+  ]));
 
   return (
     <aside className="draft-pane">

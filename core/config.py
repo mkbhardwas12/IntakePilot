@@ -37,8 +37,11 @@ class SlotSchema:
         return [k for k, s in self.slots.items() if not s.askable]
 
 
-def load_slot_schema(path: Path | None = None) -> SlotSchema:
-    path = path or ROOT / "core" / "schemas" / "default.yaml"
+def load_slot_schema(path: Path | None = None,
+                     request_type: str = "default") -> SlotSchema:
+    if path is None:
+        candidate = ROOT / "core" / "schemas" / f"{request_type}.yaml"
+        path = candidate if candidate.exists() else ROOT / "core" / "schemas" / "default.yaml"
     raw = yaml.safe_load(path.read_text())
     slots: dict[str, SlotSpec] = {}
     for key, cfg in raw["slots"].items():
@@ -54,6 +57,16 @@ def load_slot_schema(path: Path | None = None) -> SlotSchema:
             options=cfg.get("options"),
         )
     return SlotSchema(slots=slots)
+
+
+def load_all_slot_schemas() -> dict[str, SlotSchema]:
+    """One SlotSchema per fork in core/schemas/*.yaml (E: schema forks).
+    Types without a fork fall back to 'default' at lookup time."""
+    schemas = {"default": load_slot_schema()}
+    for f in sorted((ROOT / "core" / "schemas").glob("*.yaml")):
+        if f.stem != "default":
+            schemas[f.stem] = load_slot_schema(f)
+    return schemas
 
 
 @dataclass

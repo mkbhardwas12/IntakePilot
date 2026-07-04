@@ -93,10 +93,14 @@ class RequirementObject(BaseModel):
     routing: RoutingDecision | None = None
     audit: list[AuditEvent] = []   # append-only, every transition
 
+    # E: set by the deterministic request-type classifier on the first turn;
+    # selects the slot-schema fork and the learning bucket.
+    request_type: str = "default"
+
     @property
     def context_bucket(self) -> str:
-        """dept x req_type (req_type fixed to 'default' until schema forks exist)."""
-        return f"{self.requester.dept}:default"
+        """dept × request type — the tenancy/learning isolation key."""
+        return f"{self.requester.dept}:{self.request_type}"
 
     def touch(self, event: str, detail: str = "") -> None:
         self.audit.append(AuditEvent(event=event, detail=detail))
