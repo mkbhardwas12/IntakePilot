@@ -4,7 +4,11 @@
 
 ---
 
-I built and open-sourced IntakePilot. The numbers below are from its shipped demo, reproducible in about five minutes with "make dev". No cloud account, no model download.
+I've spent most of my career in enterprise IT, a lot of it around SAP. Looking back at the projects that failed or slipped, almost none died because of technology. They died at the requirement. The BRD came late, or said one thing and meant another, or three teams read it three different ways. Nobody shared the same picture, so the gap surfaced months later in UAT, where it costs the most.
+
+We gave delivery Jira and code Git. The step everything depends on, where a business need becomes a requirement, still runs on a Word template and follow-up calls.
+
+At some point I stopped complaining and built something about it, on nights and weekends. It's called IntakePilot and it's open source. The numbers below are from its shipped demo, reproducible in about five minutes with "make dev". No cloud account, no model download.
 
 A Finance Ops analyst types one sentence: "our monthly vendor report takes 3 days to compile by hand."
 
