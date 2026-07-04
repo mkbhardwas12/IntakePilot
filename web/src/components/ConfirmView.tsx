@@ -36,10 +36,11 @@ export function ConfirmView({ draft, sessionId, schema, onCancel, onConfirmed }:
   }, [draft.req_id, sessionId]);
 
   // backend_context is structured discovery data — rendered as its own card,
-  // not as a free-text editable field.
-  const slotKeys = (schema ? Object.keys(schema) : Object.keys(draft.slots)).filter(
-    (k) => k !== "backend_context"
-  );
+  // not as a free-text editable field. Slots are reviewed shakiest-first:
+  // ascending confidence puts the fields most worth a human look on top.
+  const slotKeys = (schema ? Object.keys(schema) : Object.keys(draft.slots))
+    .filter((k) => k !== "backend_context")
+    .sort((a, b) => (draft.slots[a]?.confidence ?? 0) - (draft.slots[b]?.confidence ?? 0));
   const backendContext = backendContextOf(draft.slots["backend_context"]);
 
   const changedEdits = useMemo(() => {
