@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from core.api.security import require_admin
 
 from core.models import Confirmation, Provenance, Slot, Status, coerce_edit
-from core.agents import enrichment, precedent, renderer
+from core.agents import enrichment, impact, precedent, renderer
 from core.gates import pipeline, routing
 from core.learning import exemplars as learning
 
@@ -217,6 +217,17 @@ async def _confirm_locked(ctx, req_id: str, body: ConfirmBody):
             "verdict": "pass" if g.passed else "fail",
             "detail": {"reason": g.reason, "suggestion": g.suggestion}})
 
+    # 3b. Portfolio impact: open requirements touching the same backend
+    # entities. Not a gate — collisions don't block work, they connect the
+    # people who would otherwise meet at the merge conflict.
+    collision_hits = await impact.collisions(ctx.store, obj)
+    if collision_hits:
+        obj.touch("collisions_detected",
+                  ", ".join(h["req_id"] for h in collision_hits))
+        await ctx.store.log("outcome_ledger", {
+            "req_id": req_id, "stage": "collision", "verdict": "detected",
+            "detail": {"with": collision_hits}})
+
     # 4. Routing decision (always computed, for explainability).
     decision = await routing.classify(obj, ctx.cfg.routing_queues, ctx.vector)
     obj.routing = decision
@@ -224,6 +235,7 @@ async def _confirm_locked(ctx, req_id: str, body: ConfirmBody):
     ticket = None
     if all(g.passed for g in gates):
         title, ticket_body = renderer.ticket_render(obj, schema)
+        ticket_body += impact.collision_section(collision_hits)
         ticket = await ctx.target.create_item(obj, title, ticket_body, decision.queue)
         obj.status = Status.ROUTED
         # Re-index with the final slots AND the queue: this is the routing
@@ -242,4 +254,5 @@ async def _confirm_locked(ctx, req_id: str, body: ConfirmBody):
     return {"draft": obj.model_dump(mode="json"),
             "gates": [g.model_dump() for g in gates],
             "routing": decision.model_dump(),
+            "collisions": collision_hits,
             "ticket": ticket.model_dump() if ticket else None}
