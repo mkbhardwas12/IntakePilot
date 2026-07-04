@@ -29,13 +29,16 @@ def create_app(ctx: AppContext | None = None) -> FastAPI:
         return {"status": "ok", "provider": c.llm.name, "store": c.store.name}
 
     @app.get("/api/schema")
-    async def schema(request: Request):
+    async def schema(request: Request, type: str = "default"):
         c = request.app.state.ctx
-        return {"slots": {
-            k: {"required": s.required, "askable": s.askable, "label": s.label,
-                "ask_hint": s.ask_hint, "default": s.default,
-                "default_reason": s.default_reason}
-            for k, s in c.schema.slots.items()}}
+        chosen = c.schema_for(type)
+        return {"request_type": type if type in c.schemas else "default",
+                "available_types": sorted(c.schemas),
+                "slots": {
+                    k: {"required": s.required, "askable": s.askable, "label": s.label,
+                        "ask_hint": s.ask_hint, "default": s.default,
+                        "default_reason": s.default_reason}
+                    for k, s in chosen.slots.items()}}
 
     app.include_router(sessions.router)
     app.include_router(requirements.router)

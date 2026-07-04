@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from core.config import Config, SlotSchema, load_config, load_slot_schema
+from core.config import (Config, SlotSchema, load_all_slot_schemas,
+                         load_config)
 from core.providers import make_connectors, make_llm, make_store, make_vector
 from core.agents.orchestrator import Orchestrator
 from core.targets import make_target
@@ -45,12 +46,14 @@ GLOSSARY_SEED = [
 class AppContext:
     def __init__(self, cfg: Config | None = None):
         self.cfg = cfg or load_config()
-        self.schema: SlotSchema = load_slot_schema()
+        self.schemas: dict[str, SlotSchema] = load_all_slot_schemas()
+        self.schema: SlotSchema = self.schemas["default"]
         self.llm = make_llm(self.cfg)
         self.store = make_store(self.cfg)
         self.vector = make_vector(self.cfg, self.llm)
         self.orchestrator = Orchestrator(self.llm, self.store, self.vector,
-                                         self.schema, self.cfg)
+                                         self.schema, self.cfg,
+                                         schemas=self.schemas)
         self.target = make_target(self.cfg)
         self.connectors = make_connectors(self.cfg)  # ADDENDUM-01
         # Durable escalation observability: every fall-through to the strong
@@ -71,6 +74,10 @@ class AppContext:
                 continue
             await self.store.log("glossary", {
                 **row, "last_confirmed": datetime.now(timezone.utc).isoformat()})
+
+    def schema_for(self, request_type: str) -> SlotSchema:
+        """The slot-schema fork for a request type; unknown types use default."""
+        return self.schemas.get(request_type, self.schema)
 
     async def new_req_id(self) -> str:
         year = datetime.now(timezone.utc).year

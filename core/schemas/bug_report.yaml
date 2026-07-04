@@ -1,0 +1,57 @@
+# Schema fork for something-is-broken asks (E). Adds the two slots every
+# triage conversation starts with; both are required so gate 1 refuses to
+# route a bug nobody can reproduce.
+slots:
+  business_outcome:
+    required: true
+    askable: true
+    label: Business outcome
+    ask_hint: "what should be different when this is fixed?"
+  current_behavior:
+    required: true
+    askable: true
+    label: Current behavior
+    ask_hint: "what happens today, and since when?"
+  expected_behavior:
+    required: true
+    askable: true
+    label: Expected behavior
+    ask_hint: "what should happen instead?"
+  affected_systems:
+    required: true
+    askable: false          # infer/retrieve only
+    label: Affected systems
+  urgency:
+    required: true
+    askable: true
+    label: Urgency
+    ask_hint: "how badly is this blocking you?"
+    options: [blocking now, this week, this month, workaround exists]
+  success_criteria:
+    required: true
+    askable: true
+    label: Success criteria
+    ask_hint: "how will you know it's fixed?"
+  scope_boundaries:
+    required: false
+    askable: true
+    label: Scope boundaries
+    ask_hint: "anything explicitly out of scope?"
+  data_sensitivity:
+    required: true
+    askable: false
+    label: Data sensitivity
+    default: internal
+    default_reason: "org norm; override at confirm"
+  stakeholders:
+    required: false
+    askable: false
+    label: Stakeholders
+  nfr:
+    required: false
+    askable: false
+    label: Non-functional needs
+  backend_context:
+    required: false
+    askable: false          # ADDENDUM-01: discovered, never asked
+    label: Backend context

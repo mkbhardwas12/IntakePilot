@@ -62,7 +62,8 @@ async def get_render(req_id: str, request: Request):
     ctx = _ctx(request)
     await _authorize(ctx, request, req_id)
     obj = await _latest(ctx, req_id)
-    return {"business": renderer.business_render(obj, ctx.schema)}
+    return {"business": renderer.business_render(
+        obj, ctx.schema_for(obj.request_type))}
 
 
 class RerouteBody(BaseModel):
@@ -180,6 +181,7 @@ async def confirm(req_id: str, body: ConfirmBody, request: Request):
 
 async def _confirm_locked(ctx, req_id: str, body: ConfirmBody):
     obj = await _latest(ctx, req_id)
+    schema = ctx.schema_for(obj.request_type)  # E: per-type slot schema
     if obj.status in (Status.ROUTED, Status.DONE):
         raise HTTPException(409, f"requirement already {obj.status.value}")
 
@@ -188,7 +190,7 @@ async def _confirm_locked(ctx, req_id: str, body: ConfirmBody):
     # 1. Edits: every human correction becomes an edit_diffs row + exemplar.
     edit_count = 0
     for key, corrected in body.edits.items():
-        if key not in ctx.schema.slots:
+        if key not in schema.slots:
             continue
         current = obj.slots.get(key)
         proposed = current.value if current else None
@@ -226,8 +228,8 @@ async def _confirm_locked(ctx, req_id: str, body: ConfirmBody):
     # 3. Gates (pure functions; failures logged, object never mutated by them).
     from core.agents.orchestrator import calibrated_weights, readiness
     obj.readiness_score = readiness(
-        obj, ctx.schema, await calibrated_weights(ctx.store, obj.context_bucket))
-    gates = await pipeline.run_gates(ctx.llm, obj, ctx.schema, vector=ctx.vector)
+        obj, schema, await calibrated_weights(ctx.store, obj.context_bucket))
+    gates = await pipeline.run_gates(ctx.llm, obj, schema, vector=ctx.vector)
     for g in gates:
         await ctx.store.log("outcome_ledger", {
             "req_id": req_id, "stage": f"gate{g.gate}",
@@ -240,7 +242,7 @@ async def _confirm_locked(ctx, req_id: str, body: ConfirmBody):
 
     ticket = None
     if all(g.passed for g in gates):
-        title, ticket_body = renderer.ticket_render(obj, ctx.schema)
+        title, ticket_body = renderer.ticket_render(obj, schema)
         ticket = await ctx.target.create_item(obj, title, ticket_body, decision.queue)
         obj.status = Status.ROUTED
         # Re-index with the final slots AND the queue: this is the routing

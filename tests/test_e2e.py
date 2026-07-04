@@ -96,7 +96,7 @@ async def test_golden_scenario_vendor_report(client):
 
     # And the correction is now selectable as an exemplar for similar asks.
     exemplar_text = await learning.select_exemplars(
-        ctx.vector, agent="intake", context="Finance Ops:default",
+        ctx.vector, agent="intake", context="Finance Ops:data_request",
         ask="our quarterly supplier report is compiled by hand")
     assert "BW4" in exemplar_text and "affected_systems" in exemplar_text
 

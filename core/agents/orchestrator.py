@@ -131,13 +131,19 @@ def apply_defaults(obj: RequirementObject, remaining: list[str],
 
 
 class Orchestrator:
-    def __init__(self, llm, store, vector, schema: SlotSchema, cfg: Config):
+    def __init__(self, llm, store, vector, schema: SlotSchema, cfg: Config,
+                 schemas: dict[str, SlotSchema] | None = None):
         self.llm = llm
         self.store = store
         self.vector = vector
         self.schema = schema
+        # E: schema forks per request type; unknown types fall back to default.
+        self.schemas = schemas or {"default": schema}
         self.cfg = cfg
         self._locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+
+    def schema_for(self, request_type: str) -> SlotSchema:
+        return self.schemas.get(request_type, self.schema)
 
     def lock_for(self, req_id: str) -> asyncio.Lock:
         """Per-requirement mutex shared by turns AND confirm, so a confirm can
@@ -159,6 +165,8 @@ class Orchestrator:
                 await emit(event, data)
 
         obj = await self.store.latest(session["req_id"])
+        # E: the slot schema is a fork per request type (fallback: default).
+        schema = self.schema_for(obj.request_type)
         obj.version += 1
         obj.touch("turn_started", user_msg[:200])
         before = {k: s.model_dump() for k, s in obj.slots.items()}
@@ -176,7 +184,7 @@ class Orchestrator:
                 # slots with ANSWERED provenance and inflate question metrics.
                 continue
             key = q.get("slot_key")
-            if key not in self.schema.slots:
+            if key not in schema.slots:
                 continue
             answered_ids.add(ans.get("question_id"))
             value = ans.get("value")
@@ -185,7 +193,7 @@ class Orchestrator:
                     "req_id": obj.req_id, "slot_key": key,
                     "question": (q or {}).get("text", ""), "outcome": "dont_know",
                     "changed_routing": False, "changed_slots": 0})
-                apply_defaults(obj, [key], self.schema)
+                apply_defaults(obj, [key], schema)
                 continue
             obj.slots[key] = Slot(value=value, provenance=Provenance.ANSWERED,
                                   confidence=0.95,
@@ -213,7 +221,7 @@ class Orchestrator:
                 f"- \u201c{h['term']}\u201d maps to {h['maps_to']}\n" for h in glossary_hits)
             try:
                 extraction = await intake.extract(
-                    self.llm, obj, user_msg, exemplar_text, self.schema,
+                    self.llm, obj, user_msg, exemplar_text, schema,
                     glossary_hits=glossary_text)
                 obj = intake.merge_slots(obj, extraction)  # never overwrites ANSWERED/EDITED
             except ExtractionError as exc:
@@ -224,10 +232,10 @@ class Orchestrator:
 
         # 2. GAP LADDER (deterministic order: infer, then retrieve)
         await send("status", {"stage": "resolving_gaps"})
-        gaps = gap_analyzer.open_required_slots(obj, self.schema)
-        gaps = await gap_analyzer.infer_pass(obj, gaps, self.store, self.schema)
+        gaps = gap_analyzer.open_required_slots(obj, schema)
+        gaps = await gap_analyzer.infer_pass(obj, gaps, self.store, schema)
         gaps, _ = await precedent.retrieve_pass(obj, gaps, self.store,
-                                               self.vector, self.schema)
+                                               self.vector, schema)
         for key, slot in obj.slots.items():
             if before.get(key) != slot.model_dump():
                 await send("slot", {"key": key, "slot": slot.model_dump()})
@@ -240,22 +248,22 @@ class Orchestrator:
             await send("status", {"stage": "composing_questions"})
             asked_before = {e.detail.split(":", 1)[0] for e in obj.audit
                             if e.event == "question_asked"}
-            ranked = await gap_analyzer.rank(obj, gaps, self.schema, asked_before,
+            ranked = await gap_analyzer.rank(obj, gaps, schema, asked_before,
                                              store=self.store)
-            ranked = [g for g in ranked if self.schema.slots[g.key].askable]
+            ranked = [g for g in ranked if schema.slots[g.key].askable]
             n = min(len(ranked), obj.question_budget.per_turn,
                     obj.question_budget.max - obj.question_budget.spent)
             questions = await question_composer.compose(
-                self.llm, obj, ranked[:n], self.schema)
+                self.llm, obj, ranked[:n], schema)
             questions = [q for q in questions
-                         if self.schema.slots[q.slot_key].askable][:n]
+                         if schema.slots[q.slot_key].askable][:n]
             obj.question_budget.spent += len(questions)
             for q in questions:
                 obj.touch("question_asked", f"{q.slot_key}: {q.text}")
 
         # 4. BUDGET EXHAUSTED -> assumptions with stated defaults
         if not questions:
-            obj = apply_defaults(obj, remaining=gaps, schema=self.schema)
+            obj = apply_defaults(obj, remaining=gaps, schema=schema)
             for key in obj.assumptions:
                 slot = obj.slots.get(key)
                 if slot and before.get(key) != slot.model_dump():
@@ -264,7 +272,7 @@ class Orchestrator:
         # 5. READINESS + RENDER + PERSIST (append version, stream deltas)
         await send("status", {"stage": "scoring"})
         obj.readiness_score = readiness(
-            obj, self.schema,
+            obj, schema,
             await calibrated_weights(self.store, obj.context_bucket))
         confirm_unlocked = obj.readiness_score >= self.cfg.confirm_threshold
         if questions:
