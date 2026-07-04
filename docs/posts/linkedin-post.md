@@ -18,7 +18,7 @@ And business users never get technical questions: after confirmation it auto-dis
 
 From there: optional BA pass, functional review, then your PM tool — local repo or GitHub issues today, Jira/ADO via the same one-class protocol next. AI coding agents are only as good as the ticket that feeds them — this makes that ticket.
 
-And the loops close. Duplicates get caught against the org's real history and attached with one click. When a team relabels a ticket to another queue, a webhook teaches the router it was wrong. Corrections replay as a self-writing eval suite that scores extraction accuracy on YOUR data. Intake even runs inside Slack/Teams through one endpoint — answer by number, type "confirm", done. 95 tests pin every invariant.
+And the loops close. Duplicates get caught against the org's real history and attached with one click. When a team relabels a ticket to another queue, a webhook teaches the router it was wrong. Corrections replay as a self-writing eval suite that scores extraction accuracy on YOUR data. Intake even runs inside Slack/Teams through one endpoint — answer by number, type "confirm", done. 100+ tests pin every invariant.
 
 The two drawings attached are the whole system: sheet 1 is the workflow every role shares, sheet 2 is the architecture that makes it deployable anywhere — laptop, air-gapped data center, any cloud.
 
