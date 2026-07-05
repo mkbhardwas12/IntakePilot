@@ -2,11 +2,39 @@
 
 IntakePilot is an AI requirements-intake platform built on one non-negotiable principle: **the orchestration is deterministic code; the LLM is a component, never in control.** Budgets, merge rules, status transitions, and quality gates live in Python, are enforced at runtime, and are pinned by adversarial tests. The model only proposes; code disposes.
 
-![System architecture](assets/architecture.png)
+```mermaid
+flowchart TB
+    subgraph clients["Clients"]
+        direction LR
+        WEB["Web UI · SSE Shadow Draft"]
+        BOT["Slack / Teams / mail bots"]
+        REST["REST clients"]
+    end
+    subgraph core["Deterministic core — FastAPI"]
+        direction LR
+        ORCH["Orchestrator (§6.1 loop)"]
+        GATES["5 gates + routing"]
+        ENRICH["Backend enrichment"]
+        PORTF["Portfolio: collisions · value · acceptance"]
+    end
+    subgraph protocols["Provider protocols — the only door out"]
+        direction LR
+        LLM["LLMProvider (+escalation)"]
+        STORE["Store (append-only)"]
+        VEC["VectorIndex"]
+        CONN["SystemConnector"]
+        TGT["Target"]
+    end
+    subgraph learning["Ledgers & learning loops"]
+        LED["edit_diffs · question_ledger · outcome_ledger · system_kb · glossary"]
+    end
+    clients -->|"REST + SSE · session-bound"| core
+    core -->|"protocol calls only — SDK imports fail the build"| protocols
+    core -->|"append-only writes"| LED
+    LED -.->|"exemplars · calibration · precedent"| core
+```
 
 ## The end-to-end workflow
-
-![Workflow](assets/workflow.png)
 
 A business user describes a need in plain language. IntakePilot builds a structured requirement live (the Shadow Draft), resolves gaps by inference and precedent *before* asking anything, and asks at most 3 questions per turn, 7 total — enforced in code, not in a prompt. After the human confirms, an enrichment step auto-discovers backend context (systems, tables, custom fields) so the requester is never asked a technical question, five quality gates run, and the requirement is routed to the right team queue with a written explanation and a ticket.
 
