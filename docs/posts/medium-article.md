@@ -4,7 +4,7 @@
 
 ![IntakePilot thumbnail](../assets/intakepilot-thumbnail.png)
 
-I built IntakePilot because the hardest part of enterprise delivery is often not writing code. It is getting a requirement to mean the same thing to the requester, the business analyst, the functional team, the architect, and the developer.
+Why do projects with a clear BRD still deliver the wrong thing? Because the hardest part of enterprise delivery is rarely the code. It is getting one requirement to mean the same thing to five people: the requester, the business analyst, the functional team, the architect, and the developer.
 
 The failure mode is familiar. A business user describes a need in normal language. Someone translates it into a BRD or ticket. Another team reads that translation through its own lens. By the time the work reaches engineering, the ask has quietly become a fourth or fifth version of itself.
 
