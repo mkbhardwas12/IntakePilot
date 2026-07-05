@@ -16,6 +16,52 @@ Built from `docs/build-specification.txt` (v1.0) plus
 `docs/ADDENDUM-01-backend-aware-enrichment.md`. See `docs/SPEC-REVIEW.md`
 for an honest review of the spec and the choices made where it was silent.
 
+## Contents
+
+- [How it works](#how-it-works)
+- [Who uses it, and how](#who-uses-it-and-how)
+- [The five-minute first run](#the-five-minute-first-run)
+- [Demo via curl (no UI needed)](#demo-via-curl-no-ui-needed)
+- [Architecture](#architecture)
+- [Backend-aware enrichment and the system knowledge base](#backend-aware-enrichment-and-the-system-knowledge-base)
+- [Theming](#theming)
+- [What's implemented vs. spec'd for later](#whats-implemented-vs-specd-for-later)
+- [Repo layout](#repo-layout)
+- [License](#license)
+
+## How it works
+
+![The IntakePilot workflow](docs/assets/workflow.png)
+
+1. **Describe** — a requester types (or Slack/Teams-messages) a need in
+   plain language. No form, no template, no backend vocabulary.
+2. **Draft** — the Shadow Draft builds live over SSE: extracted slots with
+   provenance badges and confidence bars. Gaps are resolved by inference
+   and precedent *before* asking anything; at most 3 questions per turn,
+   7 total — enforced in code, not in a prompt.
+3. **Confirm** — the requester reviews the shakiest fields first, revises
+   any field inline (every correction is captured as a learning signal),
+   and confirms. Nothing routes without a human confirmation.
+4. **Enrich → gate → route** — backend context (systems, tables, custom
+   fields) is auto-discovered, never asked; five quality gates run
+   (including near-duplicate detection against real past work); the
+   requirement routes to a team queue with a written explanation, an
+   annualized cost-of-delay, Given/When/Then acceptance criteria, and
+   collision warnings when other open work touches the same entities.
+5. **Learn** — confirmation edits, queue relabels, and KB validations feed
+   append-only ledgers that recalibrate extraction exemplars, question
+   ranking, readiness weights, and routing — model-agnostic learning that
+   lives in data, not weights.
+
+## Who uses it, and how
+
+| Role | Surface | What they do |
+|---|---|---|
+| **Requester** | Web chat at `/loop`, or any Slack/Teams/mail bot via `POST /api/channels/inbound` | describes the need in plain words, answers ≤7 targeted questions, pencil-edits draft fields, confirms |
+| **Analyst / BA** | Same UI + `GET /api/requirements/{id}/render` | reviews the plain-language render and assumption register, corrects fields at confirm — each correction trains future intakes |
+| **Delivery team** | The routed ticket (local repo or GitHub Issues) | gets business intent + auto-discovered system context + acceptance criteria in one ticket; relabels the queue if misrouted (webhook feeds `routing_accuracy`); validates KB discoveries (`POST /api/kb/{system}/{entity}/validate`) |
+| **Ops / admin** | `/metrics` dashboard, `GET /api/graph`, `GET /api/evals/replay`, `GET /api/glossary/proposals` | watches ROI and backlog-by-value, collision hotspots, extraction accuracy over time; accepts mined glossary terms; one env var (`INTAKEPILOT_ADMIN_TOKEN`) locks all of it |
+
 ## The five-minute first run
 
 Zero external dependencies — no model, no Docker, no database:
@@ -81,7 +127,9 @@ curl -s -X POST "localhost:8000/api/sessions/$SID/turns?stream=false" \
 #     -H "X-Session-Id: $SID" -H 'content-type: application/json' -d '{"edits":{}}'
 ```
 
-## Architecture in one paragraph
+## Architecture
+
+![System architecture](docs/assets/architecture.png)
 
 `core/` is a FastAPI app. Three provider protocols (`LLMProvider`, `Store`,
 `VectorIndex`) are the portability contract — no business logic imports a
@@ -98,6 +146,12 @@ model-agnostic learning. Gates 1/3 are deterministic pure functions; gates
 The routing classifier blends configured keyword signals with routed
 precedent from the vector index, plus confidence and a human-readable explanation. `web/` is a React + TypeScript + Vite app that
 consumes the SSE turn stream to animate the Shadow Draft live.
+
+The full design — component map, complete API surface with the auth model
+per endpoint, trust boundaries — lives in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); every deployment path
+(laptop → docker → air-gapped prod) in
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Backend-aware enrichment and the system knowledge base
 
