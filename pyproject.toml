@@ -3,7 +3,7 @@ name = "intakepilot"
 version = "0.1.0"
 description = "AI requirements-intake platform: deterministic orchestration, LLM as component"
 requires-python = ">=3.11"
-license = { text = "Apache-2.0" }
+license = { text = "MIT" }
 dependencies = [
     "fastapi==0.139.0",
     "uvicorn[standard]==0.49.0",
