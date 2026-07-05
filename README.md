@@ -1,5 +1,9 @@
 # IntakePilot
 
+[![CI](https://github.com/mkbhardwas12/IntakePilot/actions/workflows/ci.yml/badge.svg)](https://github.com/mkbhardwas12/IntakePilot/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-teal.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](pyproject.toml)
+
 AI requirements-intake platform: a business user describes a need in plain
 language; a deterministic orchestrator (LLM as component, never in control)
 extracts structured requirement slots, resolves gaps by inference and
@@ -17,7 +21,7 @@ for an honest review of the spec and the choices made where it was silent.
 Zero external dependencies — no model, no Docker, no database:
 
 ```bash
-git clone <repo> && cd intakepilot
+git clone https://github.com/mkbhardwas12/IntakePilot.git && cd IntakePilot
 make dev            # backend :8000 (mock LLM + SQLite) and web :3000
 open http://localhost:3000/loop
 # type: "our monthly vendor report takes 3 days to compile by hand"
@@ -203,11 +207,19 @@ Spec'd for later (honest gaps):
   importer CLI (a seed glossary ships for the demo)
 - Milestones 9–10: Bedrock/DynamoDB/Bedrock-KB providers, SAM template,
   Builder Agent
-- Auth/multi-tenancy, webhook signatures, migrations — see `docs/SPEC-REVIEW.md`
+- Auth/multi-tenancy (session binding + admin token + webhook signature are
+  shipped; end-user SSO is your reverse proxy's job for now), schema
+  migrations — see `docs/SPEC-REVIEW.md`
 
 ## Repo layout
 
-Matches spec Section 3: `core/` (api, agents+prompts, gates, learning,
-providers/{llm,store,vector}, targets, models.py, config.py), `web/`,
-`deploy/` (docker-compose + Dockerfiles), `evals/golden/`, `docs/`,
-`examples/demo-repo/`.
+Matches spec Section 3: `core/` (api, agents+prompts, gates, learning
+{exemplars, proposals, replay}, providers/{llm,store,vector,connector},
+targets, schemas, models.py, config.py), `web/`, `deploy/` (docker-compose +
+Dockerfiles + nginx), `scripts/` (ops_check.py live-API readiness sweep),
+`tests/` (117 tests: invariants, e2e, per-feature suites), `evals/golden/`,
+`docs/`, `examples/demo-repo/`.
+
+## License
+
+[MIT](LICENSE)

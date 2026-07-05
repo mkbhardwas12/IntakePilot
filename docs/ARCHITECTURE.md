@@ -46,6 +46,67 @@ flowchart LR
 
 `core/` — FastAPI app: `api/` (routers), `agents/` (orchestrator, intake, gap analyzer, question composer, enrichment, renderer), `gates/`, `learning/` (exemplars), `providers/` (llm, store, vector, connector), `targets/`, `models.py`, `config.py`. `web/` — React + TypeScript + Vite, SSE streaming UI, semantic-token theming (dark/light). `deploy/` — dev and prod compose files, Dockerfiles, nginx config. `tests/` — invariant, e2e, enrichment, portfolio, and API suites (100+ tests). `evals/golden/` — golden intake scenarios. `docs/` — build spec, addendum, spec review, design guidelines, deployment, this file.
 
+## Component map
+
+```mermaid
+flowchart TB
+    subgraph web["web/ — React + TS + Vite"]
+        UI["Chat + Shadow Draft (SSE)<br/>Confirm view · Metrics"]
+    end
+    subgraph api["core/api — FastAPI routers"]
+        SESS["sessions · requirements"]
+        OPS["metrics · kb · evals · glossary<br/>graph · channels · webhooks"]
+        SEC["security.py<br/>admin token · webhook HMAC"]
+    end
+    subgraph agents["core/agents"]
+        ORCH["orchestrator (turn loop)"]
+        HELPERS["intake · gap_analyzer · question_composer<br/>precedent · enrichment · renderer<br/>request_type · acceptance · impact · value"]
+    end
+    subgraph gates["core/gates"]
+        G["5-gate pipeline · routing classifier"]
+    end
+    subgraph learning["core/learning"]
+        L["exemplars · proposals · replay"]
+    end
+    subgraph providers["core/providers — the portability contract"]
+        LLM["LLMProvider<br/>mock · ollama · openai_compat<br/>(+EscalatingLLM tier)"]
+        STORE["Store<br/>sqlite · postgres"]
+        VEC["VectorIndex<br/>local · pgvector"]
+        CONN["SystemConnector<br/>fixture (SAP demo, Postgres demo)"]
+    end
+    TGT["core/targets<br/>local repo · GitHub issues"]
+
+    UI -->|REST + SSE| SESS
+    SESS --> ORCH
+    ORCH --> HELPERS
+    SESS -->|confirm| G
+    G --> TGT
+    ORCH & HELPERS & G --> LLM
+    ORCH & L --> STORE & VEC
+    HELPERS -->|post-confirm enrichment| CONN
+    OPS --> STORE & VEC & L
+    SEC -.guards.- OPS
+```
+
+No business logic imports a provider SDK — a lint test fails the build if one does. Every arrow into `providers/` goes through the four protocols.
+
+## API surface
+
+| Endpoint | Auth | Purpose |
+|---|---|---|
+| `GET /health`, `GET /api/schema?type=` | open | liveness; slot schema (per request-type fork) |
+| `POST /api/sessions` · `GET /api/sessions/{id}` · `POST /api/sessions/{id}/turns?stream=` | open (session-scoped) | create session; recover state; run a turn (SSE or JSON) — answers, `revisions`, message |
+| `GET /api/requirements/{id}` (+`/history`, `/render`) | `X-Session-Id` owner | requirement state, versions, plain-language render |
+| `POST /api/requirements/{id}/confirm` · `/attach` | `X-Session-Id` owner | confirm (edits→learning, enrichment, gates, routing, ticket); merge a gated duplicate |
+| `POST /api/requirements/{id}/reroute` · `GET/POST .../consent` | admin token | routing ground truth from the ticket tool; stakeholder countersigns |
+| `GET /api/metrics` · `GET /api/graph` | admin token | Section-9 metrics + backlog-by-value; collision hotspots |
+| `GET/POST /api/kb...` (`/validate`, `/refresh`) | admin token | system-KB view, human validation, connector re-scan |
+| `GET /api/evals/replay` · `GET /api/glossary/proposals` · `POST /api/glossary` | admin token | corrections-as-evals; mined glossary proposals; human accept |
+| `POST /api/channels/inbound` | admin token (bot credential) | Slack/Teams/mail adapter — plain-text turn loop |
+| `POST /api/webhooks/github` | HMAC `X-Hub-Signature-256` | label-change reroute feedback |
+
+"Admin token" = `INTAKEPILOT_ADMIN_TOKEN`; unset (demo posture) these surfaces stay open, set it and every one of them requires `Authorization: Bearer` (constant-time compare).
+
 ## Trust boundaries and current limits
 
 There is **no end-user SSO yet** — requirements are bound to their creating session (`X-Session-Id`, anti-enumeration 404s), one bearer token (`INTAKEPILOT_ADMIN_TOKEN`) closes every admin/ops surface, and the GitHub webhook verifies `X-Hub-Signature-256` — but user identity remains your reverse proxy's job (`docs/DEPLOYMENT.md`, security checklist). Multi-tenancy, the Jira/ADO target, the full 40-scenario eval harness, and the Builder Agent (the component that will attach generated code scaffolds to tickets automatically) are specified in the build spec's later milestones; `PROJECT-REVIEW.md` tracks the honest gap list.

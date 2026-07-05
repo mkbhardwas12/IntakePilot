@@ -1,5 +1,16 @@
 # Project Review — 2026-07-03
 
+> **Status update (2026-07-05):** this is a point-in-time review kept for
+> the record. Everything under "Remaining — high priority" has since
+> shipped: session-bound requirement access + `INTAKEPILOT_ADMIN_TOKEN` on
+> all ops surfaces + signed GitHub webhooks (`core/api/security.py`),
+> atomic vector-index persistence, the GitHub target wired via
+> `INTAKEPILOT_TARGET`, and the medium/low lists are largely addressed
+> (typed request bodies, gate-4 grounded in real known work, evals that
+> replay the edit ledger). Current state: 117 passing tests plus
+> `scripts/ops_check.py`, a 31-check live-API sweep. Remaining honest gaps
+> are tracked in README "What's implemented vs. spec'd for later".
+
 Deep review of the full codebase (backend, frontend, deploy, docs, tests), plus verification that the project runs. Nine issues were fixed directly; the rest are catalogued below by priority.
 
 ## Verification results

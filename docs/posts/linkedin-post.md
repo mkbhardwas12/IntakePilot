@@ -1,40 +1,60 @@
 # LinkedIn Post
 
-*(Attach `docs/assets/workflow-social.png` FIRST — the mobile-friendly version — and `docs/assets/architecture.png` second. The detailed engineering sheet `workflow.png` stays in the repo/Medium. Paste the text below as-is; it is ~2,912 characters, leaving room for the two real URLs within LinkedIn's 3,000 limit. Add the GitHub + Medium links before posting.)*
+*(Attach `docs/assets/intakepilot-thumbnail.png` first as the labeled main thumbnail. Attach `docs/assets/architecture.png` second for the technical audience. The clean unlabeled artwork is preserved at `docs/assets/intakepilot-thumbnail-clean.png` if you want a quieter variant later. After the Medium article is published, replace `[Medium link]` with the real URL.)*
 
 ---
 
-After many years in enterprise IT, most of them around SAP, I keep hearing the same sentence from colleagues, friends at other companies, people at user groups: "Getting a clear BRD is hard when no one is aligned yet on what should change, where, and how."
+I just shipped a hardening pass for IntakePilot, my open-source AI requirements-intake platform.
 
-The story is always the same. Business describes a need, a business analyst helps translate it, the functional side reads it one way, the developer another. Each closes a gap for the next person; the differences surface late, when fixes are expensive. Nobody did anything wrong. The ask just changed shape every time it changed hands.
+The problem it is built for is painfully familiar in enterprise IT: a business user says what they need in plain language, a BA translates it, functional teams interpret it, developers interpret it again, and the requirement quietly changes shape every time it moves.
 
-I heard it often enough that I stopped nodding and started building, in my own time. The community has helped me grow everywhere I have been, mostly through people who never knew they were helping. So this is a give-back: IntakePilot, open source. Use it as it is, or adapt the basics to your setup.
+IntakePilot keeps that first conversation alive as structured evidence.
 
-It turns a plain-language business ask into a structured, quality-gated, correctly routed, code-ready requirement. Local-first: your model, your data, your network boundary.
+A requester can type:
 
-Demo ask: "our monthly vendor report takes 3 days to compile by hand."
+> our monthly vendor report takes 3 days to compile by hand
 
-Before asking anything, it drafts the requirement live: outcome extracted, stakeholders inferred, systems pulled from the org glossary, assumptions declared, readiness scored.
+The system builds a live Shadow Draft, asks only the missing business questions, runs quality gates after confirmation, enriches the ask with backend context, and routes a code-ready requirement with a written explanation.
 
-Then it asks only the missing business questions, with the budget enforced in Python, not a prompt. A malicious model can ask for more; the orchestrator refuses.
+The design rule is simple:
 
-After confirmation, five gates run (schema, INVEST, ambiguity, duplicates, routing sanity); the route is explained in writing. The ticket keeps the original ask word for word, with provenance and confidence on every claim.
+**The LLM proposes. Deterministic code decides.**
 
-Business users are never asked about SAP tables or backend columns. Enrichment resolves that after confirmation. In the SAP demo, "order info" maps to VBAK/VBAP and a Z-field with its owner.
+Architecture, in practical terms:
 
-Learning lives in ledgers, not weights: corrections become prompt exemplars, reroutes teach the router, repeated edits become glossary proposals, and replays show whether accuracy is improving.
+- React + TypeScript UI streams the intake loop with Server-Sent Events.
+- FastAPI orchestrator owns the extract -> merge -> gap analysis -> budgeted questions -> readiness -> confirm flow.
+- Provider protocols isolate the model, store, vector index, system connector, and ticket target.
+- SQLite/mock mode runs locally in minutes; Postgres + pgvector + Ollama runs as the full local stack.
+- Backend-aware enrichment resolves business terms to real system context, including SAP-style tables, custom fields, and owner metadata.
+- Ledgers capture edits, questions, outcomes, reroutes, glossary proposals, and eval replay data.
+- Five gates check schema quality, INVEST quality, ambiguity, duplicates, and routing sanity.
 
-And it sees the portfolio, not just one ticket. Two different asks touching the same SAP table meet at intake, not at the merge conflict. Every ticket prices its own pain ("3 days, monthly, by hand" = 288 hours a year of doing nothing). Routed work carries generated acceptance criteria. Named stakeholders countersign before the build.
+This latest pass tightened the parts that matter before real usage:
 
-The rule: the LLM proposes, deterministic code decides.
+- schema-fork-aware eval replay, so bug reports and data requests are tested against their own slot schemas
+- frontend schema loading per request type
+- admin protection for metrics when an admin token is configured
+- cleaner local-LLM production compose defaults
+- dev/runtime dependency split
+- Vite upgrade with a clean audit
+- better test isolation
 
-Local repo and GitHub issues work today; Jira/ADO and the builder-agent scaffold are next via the same protocol.
+Verified:
 
-The drawings show the workflow and the architecture: laptop, air-gapped on-prem, or any cloud.
+- 117 backend tests passing
+- TypeScript check passing
+- production frontend build passing
+- npm audit: 0 vulnerabilities
+- pip check clean
+- dev and prod Docker Compose configs valid
+- end-to-end HTTP ops check: 31/31 checks passed
 
-Code + drawings: [GitHub link]
-Longer write-up: [Medium link]
+The repo includes the architecture diagram, workflow diagram, local demo, Docker deployment path, and the exact tests that pin the invariants.
 
-If something doesn't fit your intake process, tell me. I'd rather improve it against real needs than guesses.
+GitHub: https://github.com/mkbhardwas12/IntakePilot
+Longer architecture write-up: [Medium link]
 
-#EnterpriseAI #SAP #LocalLLM #OpenSource
+If your intake process has different gates, schemas, or routing rules, that is the point: the core is meant to be forked around real enterprise workflows, not one generic template.
+
+#EnterpriseAI #OpenSource #SAP #LocalLLM #AIArchitecture #SoftwareEngineering
