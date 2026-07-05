@@ -4,57 +4,25 @@
 
 ---
 
-I just shipped a hardening pass for IntakePilot, my open-source AI requirements-intake platform.
+Last month I watched a simple request die the usual death.
 
-The problem it is built for is painfully familiar in enterprise IT: a business user says what they need in plain language, a BA translates it, functional teams interpret it, developers interpret it again, and the requirement quietly changes shape every time it moves.
+A finance analyst asked for help: "our monthly vendor report takes 3 days to compile by hand." By the time it reached a sprint board it had been translated four times — requester to BA, BA to functional team, functional to architect, architect to developer. Nobody did anything wrong. Every translation was careful and well-meant. And the thing that shipped still wasn't what she needed.
 
-IntakePilot keeps that first conversation alive as structured evidence.
+That gap is what I built IntakePilot for.
 
-A requester can type:
+You type the ask in plain words. It builds the requirement live — what it extracted, what it inferred from precedent, what it assumed and why — and asks at most seven questions, a budget enforced in code, not in a prompt. You confirm. It then discovers the backend context on its own (SAP tables, custom Z-fields, owning teams), so nobody has to interrogate a business user about systems she's never heard of. Five quality gates run, including a real duplicate check against past work. The ticket routes with a written explanation and a price on the delay: 3 days × 12 months is 288 hours a year of someone's working life.
 
-> our monthly vendor report takes 3 days to compile by hand
+One rule holds it together: the LLM proposes, deterministic code decides. Budgets, merges, gates, routing — plain Python, pinned by tests. The model cannot overwrite a human's answer. Ever.
 
-The system builds a live Shadow Draft, asks only the missing business questions, runs quality gates after confirmation, enriches the ask with backend context, and routes a code-ready requirement with a written explanation.
+The part I care most about: it runs on whatever AI you're allowed to use. Mock model for the offline demo, Ollama fully air-gapped, or any OpenAI-compatible endpoint (Azure, vLLM, LiteLLM, OpenRouter). Enabling your own model is three environment variables — no code changes — and /health tells you which model is answering. There's a hybrid mode too: a local model handles the day-to-day, a stronger one steps in only when structured output fails validation twice.
 
-The design rule is simple:
+Every human correction lands in an append-only ledger and improves the next intake. The learning lives in data, not weights — swap the model next quarter, keep the memory.
 
-**The LLM proposes. Deterministic code decides.**
+Current state: 125 backend tests, a 31-check live ops probe, Docker paths from laptop to air-gapped prod. Honest gaps too: no end-user SSO yet; Jira/ADO targets are next.
 
-Architecture, in practical terms:
-
-- React + TypeScript UI streams the intake loop with Server-Sent Events.
-- FastAPI orchestrator owns the extract -> merge -> gap analysis -> budgeted questions -> readiness -> confirm flow.
-- Provider protocols isolate the model, store, vector index, system connector, and ticket target.
-- SQLite/mock mode runs locally in minutes; Postgres + pgvector + Ollama runs as the full local stack.
-- Backend-aware enrichment resolves business terms to real system context, including SAP-style tables, custom fields, and owner metadata.
-- Ledgers capture edits, questions, outcomes, reroutes, glossary proposals, and eval replay data.
-- Five gates check schema quality, INVEST quality, ambiguity, duplicates, and routing sanity.
-
-This latest pass tightened the parts that matter before real usage:
-
-- schema-fork-aware eval replay, so bug reports and data requests are tested against their own slot schemas
-- frontend schema loading per request type
-- admin protection for metrics when an admin token is configured
-- cleaner local-LLM production compose defaults
-- dev/runtime dependency split
-- Vite upgrade with a clean audit
-- better test isolation
-
-Verified:
-
-- 117 backend tests passing
-- TypeScript check passing
-- production frontend build passing
-- npm audit: 0 vulnerabilities
-- pip check clean
-- dev and prod Docker Compose configs valid
-- end-to-end HTTP ops check: 31/31 checks passed
-
-The repo includes the architecture diagram, workflow diagram, local demo, Docker deployment path, and the exact tests that pin the invariants.
+Open source, MIT. If your intake chain loses meaning between well-intentioned hand-offs, have a look — and tell me where it's wrong.
 
 GitHub: https://github.com/mkbhardwas12/IntakePilot
-Longer architecture write-up: [Medium link]
+Architecture write-up: [Medium link]
 
-If your intake process has different gates, schemas, or routing rules, that is the point: the core is meant to be forked around real enterprise workflows, not one generic template.
-
-#EnterpriseAI #OpenSource #SAP #LocalLLM #AIArchitecture #SoftwareEngineering
+#EnterpriseAI #OpenSource #LocalLLM #RequirementsEngineering #SAP

@@ -6,7 +6,7 @@
 
 Why do projects with a clear BRD still deliver the wrong thing? Because the hardest part of enterprise delivery is rarely the code. It is getting one requirement to mean the same thing to five people: the requester, the business analyst, the functional team, the architect, and the developer.
 
-The failure mode is familiar. A business user describes a need in normal language. Someone translates it into a BRD or ticket. Another team reads that translation through its own lens. By the time the work reaches engineering, the ask has quietly become a fourth or fifth version of itself.
+I keep seeing the same scene. A finance analyst says, in perfectly clear English, "our monthly vendor report takes 3 days to compile by hand." A BA turns that into a BRD — carefully, and usually well. A functional consultant reads the BRD through the lens of the modules they own. An architect scopes it against the platform. A developer implements the scoped version. Five hand-offs, five honest interpretations, and each one closes a real gap for the next person. Nobody is the villain here. The drift is structural: meaning leaks a little at every well-intentioned translation, and there are no spare hands to chase every follow-up, record every clarification, and keep the document aligned with what was actually said.
 
 Most teams do not need another blank template. They need the intake conversation to stay alive as structured evidence: what was said, what was inferred, what was assumed, what was corrected, what system context was discovered, and why the work was routed where it was.
 
@@ -95,29 +95,11 @@ The ledgers also make learning explicit:
 
 The learning lives in data, not fine-tuned weights. Swap the model later and the operating memory stays.
 
-## What changed in the latest hardening pass
+## How I know it works
 
-I recently did a full review and implementation pass focused on correctness, deployment, and publish-readiness. The current repo now includes:
+I distrust demos, including my own, so the repo carries its own evidence. There are 125 backend tests, and they are not ceremony: adversarial suites try to trick the orchestrator into overspending the question budget, overwriting a human's answer, or routing without a confirmation — the invariants hold because tests pin them, not because a prompt asks nicely. A separate live probe (`scripts/ops_check.py`) runs 31 end-to-end checks against a running API: request-type classification, budget exhaustion, duplicate-detection-then-attach, forged-input rejection, hostile strings through the whole confirm path, and the ops endpoints. TypeScript builds clean, `npm audit` reports zero vulnerabilities, and both Docker Compose paths validate.
 
-- schema-fork-aware replay evals, so corrections from `bug_report` and `data_request` flows are scored against the source request type schema
-- frontend schema loading that follows the active request type instead of assuming the default schema
-- admin-token protection for `/api/metrics` when `INTAKEPILOT_ADMIN_TOKEN` is configured
-- cleaner production compose defaults for the local Ollama profile
-- a runtime/dev Python dependency split with `requirements-dev.txt`
-- upgraded Vite tooling with a clean npm audit
-- isolated test demo output so tests do not write into the example repo
-- an ops check that can target any base URL through `INTAKEPILOT_BASE_URL`
-
-The verification was deliberately end to end:
-
-- `make test`: 117 tests passed
-- direct pytest run: 117 tests passed
-- TypeScript check passed
-- production frontend build passed
-- `npm audit`: 0 vulnerabilities
-- `pip check`: no broken requirements
-- dev and prod Docker Compose configs validated
-- HTTP ops check against a temporary API: 31/31 checks passed
+My favorite test failure so far: on its second run, the ops probe "failed" two checks — because the learning loops had already absorbed the first run's data and stopped asking questions the precedent could answer. The product outsmarted its own test. I made the probe learning-aware and kept the lesson.
 
 ## How to try it
 
