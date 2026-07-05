@@ -21,6 +21,7 @@ for an honest review of the spec and the choices made where it was silent.
 - [How it works](#how-it-works)
 - [Who uses it, and how](#who-uses-it-and-how)
 - [The five-minute first run](#the-five-minute-first-run)
+- [Bring your own AI](#bring-your-own-ai)
 - [Demo via curl (no UI needed)](#demo-via-curl-no-ui-needed)
 - [Architecture](#architecture)
 - [Backend-aware enrichment and the system knowledge base](#backend-aware-enrichment-and-the-system-knowledge-base)
@@ -32,6 +33,19 @@ for an honest review of the spec and the choices made where it was silent.
 ## How it works
 
 ![The IntakePilot workflow](docs/assets/workflow.png)
+
+```mermaid
+flowchart LR
+    A["Plain-language ask<br/>(web chat or Slack/Teams bot)"] --> B["Shadow Draft<br/>extract + infer + retrieve<br/>provenance & confidence live"]
+    B --> C{"Gaps left?"}
+    C -- "yes, budget left" --> Q["≤ 3 questions/turn, ≤ 7 total<br/>(enforced in code)"] --> B
+    C -- no --> D["Human confirm<br/>inline revisions → learning ledger"]
+    D --> E["Backend enrichment<br/>systems & custom fields discovered,<br/>never asked"]
+    E --> F["5 quality gates<br/>incl. near-duplicate check"]
+    F -- pass --> G["Routed ticket<br/>queue + explanation + cost-of-delay<br/>+ acceptance criteria + collisions"]
+    F -- fail --> H["Gated with reasons<br/>fix & reconfirm, or attach to duplicate"]
+    G -. "reroutes, edits, validations" .-> B
+```
 
 1. **Describe** — a requester types (or Slack/Teams-messages) a need in
    plain language. No form, no template, no backend vocabulary.
@@ -101,17 +115,53 @@ secrets, non-root API, bring-your-own LLM endpoint). Every path is documented
 in `docs/DEPLOYMENT.md`; the system design lives in `docs/ARCHITECTURE.md`.
 
 Providers are selected in `intakepilot.yaml` and can be overridden with env
-vars: `INTAKEPILOT_LLM=mock|ollama|openai_compat`,
-`INTAKEPILOT_STORE=sqlite|postgres`, `INTAKEPILOT_VECTOR=local|pgvector`.
-Any OpenAI-compatible endpoint works via `OPENAI_BASE_URL`/`OPENAI_MODEL`.
-Setting `DATABASE_URL` switches the store to Postgres automatically.
+vars — see [Bring your own AI](#bring-your-own-ai) for the one-line model
+switch. `INTAKEPILOT_STORE=sqlite|postgres`,
+`INTAKEPILOT_VECTOR=local|pgvector`; setting `DATABASE_URL` switches the
+store to Postgres automatically.
 
-**Hybrid model strategy:** set `INTAKEPILOT_LLM_ESCALATION` to give the
-intake a second, stronger model (cloud frontier or bigger internal) that
-answers only when the primary fails structured-output validation twice —
-local-first economics with frontier-grade interpretation on the hard turns.
-Escalations taper off as the learning ledger accumulates exemplars from
-daily usage. Embeddings always stay on the primary.
+## Bring your own AI
+
+The demo runs on a deterministic mock so it works with zero setup — but the
+backend is built to run **any AI you already have, enabled by environment
+variables alone**. No code changes, no redeploy of anything else: set the
+vars, restart the API, done. Structured outputs are schema-validated with
+retry regardless of provider, so a weaker model degrades gracefully instead
+of corrupting a draft.
+
+| You want | Set | Notes |
+|---|---|---|
+| **Offline demo** (default) | `INTAKEPILOT_LLM=mock` | deterministic, no model, no network |
+| **Local / air-gapped** (Ollama) | `INTAKEPILOT_LLM=ollama` | model per `intakepilot.yaml` (`llama3.1` + `nomic-embed-text`); `OLLAMA_BASE_URL` to point elsewhere |
+| **OpenAI** | `INTAKEPILOT_LLM=openai_compat`<br/>`OPENAI_API_KEY=sk-…` | `OPENAI_MODEL` to pick the model (default `gpt-4o-mini`) |
+| **Azure OpenAI / vLLM / LiteLLM / OpenRouter / TGI / llama.cpp / internal gateway** | `INTAKEPILOT_LLM=openai_compat`<br/>`OPENAI_BASE_URL=https://…/v1`<br/>`OPENAI_MODEL=…`<br/>`OPENAI_API_KEY=…` | anything that speaks `/v1/chat/completions` works; Anthropic/Gemini/Bedrock via a LiteLLM or OpenRouter gateway |
+| **Hybrid: local first, frontier on hard turns** | any primary above **+** `INTAKEPILOT_LLM_ESCALATION=openai_compat` | the stronger model answers **only** when the primary fails schema validation twice — local-first economics, frontier-grade interpretation where it matters |
+
+```bash
+# example: local Ollama day-to-day, OpenAI only for the hard turns
+export INTAKEPILOT_LLM=ollama
+export INTAKEPILOT_LLM_ESCALATION=openai_compat
+export OPENAI_API_KEY=sk-...
+.venv/bin/uvicorn core.api.main:app --port 8000
+curl -s localhost:8000/health   # -> "provider": "ollama+openai_compat"
+```
+
+```mermaid
+flowchart LR
+    T["Turn / gate / question call"] --> P["Primary model<br/>mock · ollama · openai_compat"]
+    P -->|"valid JSON (schema-checked)"| OK["Proceed"]
+    P -->|"invalid ×2"| E["Escalation model<br/>(optional, one attempt)"]
+    E -->|valid| OK
+    E -->|invalid| D["Graceful degrade:<br/>draft kept, turn flagged,<br/>no budget spent"]
+    OK -. "every human correction" .-> L["Learning ledger<br/>exemplars → fewer escalations"]
+    L -.-> P
+```
+
+Embeddings always stay on the primary so the vector index stays
+dimensionally consistent; escalation rate is measurable at `/api/metrics`
+and tapers as the learning ledger grows. Fine-grained settings (embed
+models, timeouts, per-tier overrides) live in `intakepilot.yaml` under
+`llm:` / `llm_escalation:`.
 
 ## Demo via curl (no UI needed)
 

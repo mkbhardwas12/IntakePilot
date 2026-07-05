@@ -27,7 +27,13 @@ def create_app(ctx: AppContext | None = None) -> FastAPI:
     @app.get("/health")
     async def health(request: Request):
         c = request.app.state.ctx
-        return {"status": "ok", "provider": c.llm.name, "store": c.store.name}
+        # `model` makes bring-your-own-AI verifiable at a glance: set the env
+        # vars, restart, curl /health — you should see YOUR model here.
+        llm = c.llm
+        model = (getattr(llm, "model", None)
+                 or getattr(getattr(llm, "primary", None), "model", None))
+        return {"status": "ok", "provider": llm.name, "model": model,
+                "store": c.store.name}
 
     @app.get("/api/schema")
     async def schema(request: Request, type: str = "default"):
