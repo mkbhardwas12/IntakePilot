@@ -32,8 +32,6 @@ for an honest review of the spec and the choices made where it was silent.
 
 ## How it works
 
-![The IntakePilot workflow](docs/assets/workflow.png)
-
 ```mermaid
 flowchart LR
     A["Plain-language ask<br/>(web chat or Slack/Teams bot)"] --> B["Shadow Draft<br/>extract + infer + retrieve<br/>provenance & confidence live"]
@@ -179,7 +177,44 @@ curl -s -X POST "localhost:8000/api/sessions/$SID/turns?stream=false" \
 
 ## Architecture
 
-![System architecture](docs/assets/architecture.png)
+```mermaid
+flowchart TB
+    subgraph clients["Clients"]
+        direction LR
+        WEB["Web UI<br/>React + Vite · live Shadow Draft (SSE)"]
+        BOT["Chat bots<br/>Slack · Teams · mail"]
+        REST["REST clients<br/>plain-JSON turns"]
+    end
+
+    subgraph core["Deterministic core — FastAPI (the LLM never controls the loop)"]
+        direction LR
+        ORCH["Orchestrator<br/>extract → infer → retrieve →<br/>budgeted questions → confirm"]
+        GATES["5 gates + routing<br/>dedup against real past work"]
+        ENRICH["Enrichment<br/>backend context discovered,<br/>never asked"]
+        PORTF["Portfolio<br/>collisions · cost-of-delay ·<br/>acceptance criteria"]
+    end
+
+    subgraph protocols["Provider protocols — the only door out (no SDK imports in business logic)"]
+        direction LR
+        LLM["LLMProvider<br/>mock · Ollama · any OpenAI-compatible<br/>+ optional escalation tier"]
+        STORE["Store<br/>SQLite · Postgres<br/>append-only versions"]
+        VEC["VectorIndex<br/>local · pgvector"]
+        CONN["SystemConnector<br/>SAP demo fixture · your ERP"]
+        TGT["Target<br/>local repo · GitHub issues"]
+    end
+
+    subgraph learning["Ledgers & learning loops"]
+        direction LR
+        LED["edit_diffs · question_ledger · outcome_ledger · system_kb · glossary"]
+        LOOP["exemplars · question ranking · readiness calibration ·<br/>routing precedent · corrections-as-evals · glossary proposals"]
+    end
+
+    clients -->|"REST + SSE · session-bound"| core
+    core -->|"protocol calls only"| protocols
+    core -->|"append-only writes · outcomes · discoveries"| LED
+    LED --> LOOP
+    LOOP -.->|"every human correction improves the next intake"| core
+```
 
 `core/` is a FastAPI app. Three provider protocols (`LLMProvider`, `Store`,
 `VectorIndex`) are the portability contract — no business logic imports a

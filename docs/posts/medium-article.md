@@ -64,7 +64,7 @@ Provider protocols isolate every external dependency:
 - `SystemConnector` for backend/entity discovery
 - `Target` for local repo output today and issue trackers as the integration boundary
 
-That means the same code path can run in a five-minute local mock demo, on a laptop with Ollama, on an internal GPU server, or against a governed OpenAI-compatible endpoint. The model is a deployment choice, not a business-logic dependency.
+That means the same code path can run in a five-minute local mock demo, on a laptop with Ollama, on an internal GPU server, or against a governed OpenAI-compatible endpoint. The model is a deployment choice, not a business-logic dependency. And enabling your own AI is configuration, not integration work: set the endpoint, the API key, and the model name, restart, and `/health` reports which model is answering. If your model policy changes next quarter, you change three environment variables and nothing else. Structured outputs are schema-validated with retry no matter which provider is behind them, so switching models never risks a corrupted draft. Tests pin this: every provider, including the hybrid escalation pair, can be enabled from environment variables alone.
 
 ## Why backend-aware enrichment matters
 
