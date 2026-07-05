@@ -4,11 +4,13 @@
 
 ---
 
-Last month I watched a simple request die the usual death.
+A requirement in a large company is translated four times before a developer ever reads it.
 
-A finance analyst asked for help: "our monthly vendor report takes 3 days to compile by hand." By the time it reached a sprint board it had been translated four times — requester to BA, BA to functional team, functional to architect, architect to developer. Nobody did anything wrong. Every translation was careful and well-meant. And the thing that shipped still wasn't what she needed.
+Requester to BA. BA to functional team. Functional to architect. Architect to developer. Each translation is careful. Each one loses a little meaning. The bill arrives at UAT — "that's not what I asked for" — and by then it's the most expensive sentence in the project.
 
-That gap is what I built IntakePilot for.
+Watch it happen with something trivial: a finance analyst says, in perfectly clear words, "our monthly vendor report takes 3 days to compile by hand." Five hand-offs later, something ships. It is well-built, tested, documented — and not what she needed. Nobody did anything wrong. Every translation was well-meant. The drift is structural, not human error.
+
+IntakePilot is my open-source attempt at closing that gap.
 
 You type the ask in plain words. It builds the requirement live — what it extracted, what it inferred from precedent, what it assumed and why — and asks at most seven questions, a budget enforced in code, not in a prompt. You confirm. It then discovers the backend context on its own (SAP tables, custom Z-fields, owning teams), so nobody has to interrogate a business user about systems she's never heard of. Five quality gates run, including a real duplicate check against past work. The ticket routes with a written explanation and a price on the delay: 3 days × 12 months is 288 hours a year of someone's working life.
 
