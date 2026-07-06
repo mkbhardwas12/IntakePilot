@@ -2,7 +2,7 @@
 
 *A business user starts with one sentence. IntakePilot turns it into a structured, quality-gated, routed requirement, with deterministic orchestration and a local-first architecture.*
 
-![IntakePilot thumbnail](../assets/intakepilot-thumbnail.png)
+![From a plain-language ask, through deterministic gates and orchestration, to your own secured infrastructure — with one amber thread of learning feeding every correction back.](../assets/hero-illustration.png)
 
 Why do projects with a clear BRD still deliver the wrong thing? Because the hardest part of enterprise delivery is rarely the code. It is getting one requirement to mean the same thing to five people: the requester, the business analyst, the functional team, the architect, and the developer.
 

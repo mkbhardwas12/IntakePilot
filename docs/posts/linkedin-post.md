@@ -1,6 +1,6 @@
 # LinkedIn Post
 
-*(Attach `docs/assets/intakepilot-thumbnail.png` first as the labeled main thumbnail. Attach `docs/assets/architecture.png` second for the technical audience. The clean unlabeled artwork is preserved at `docs/assets/intakepilot-thumbnail-clean.png` if you want a quieter variant later. After the Medium article is published, replace `[Medium link]` with the real URL.)*
+*(Attach `docs/assets/hero-illustration.png` first — the text-free hero; paste the caption from `docs/assets/thumbnail-brief.md` §4 under it. Attach `docs/assets/architecture.png` second for the technical audience. `docs/assets/hero-illustration-labeled.png` is the numbered/legend variant for slides or the README. After the Medium article is published, replace `[Medium link]` with the real URL.)*
 
 ---
 

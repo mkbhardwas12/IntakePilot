@@ -99,12 +99,19 @@ enterprise infrastructure on the other, with IntakePilot as the bridge.
 
 ## 6. Known-good review checklist (run on every new render)
 
-- [ ] Zero legible or pseudo-text anywhere (zoom in on screens and panels)
-- [ ] No recognizable third-party logo or mascot
-- [ ] Key objects inside the middle 80% (crop-safe)
-- [ ] Still readable scaled to 200 px wide
-- [ ] Exactly one amber element family (gate tile + return cable)
-- [ ] Export ≥1600×800 PNG; save as `docs/assets/hero-illustration.png`
+- [x] Zero legible or pseudo-text anywhere (zoom in on screens and panels)
+- [x] No recognizable third-party logo or mascot
+- [x] Key objects inside the middle 80% (crop-safe)
+- [x] Still readable scaled to 200 px wide
+- [x] Exactly one amber element family (gate tile + return cable)
+- [x] Export ≥1600×800 PNG; save as `docs/assets/hero-illustration.png`
+
+Current render (1774×887) passed all checks on 2026-07-06. A labeled
+teaching variant — numbered badges plus a typed legend band, generated
+programmatically so the text cannot be misspelled — lives at
+`docs/assets/hero-illustration-labeled.png`. Use the clean hero for
+covers/thumbnails and the labeled one for slides, the README, or anywhere
+a caption can't travel with the image.
 
 ## 7. Relationship to the other assets
 
