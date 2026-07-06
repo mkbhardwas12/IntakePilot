@@ -12,7 +12,7 @@ Watch it happen with something trivial: a finance analyst says, in perfectly cle
 
 IntakePilot is my open-source attempt at closing that gap.
 
-You type the ask in plain words. It builds the requirement live — what it extracted, what it inferred from precedent, what it assumed and why — and asks at most seven questions, a budget enforced in code, not in a prompt. You confirm. It then discovers the backend context on its own (SAP tables, custom Z-fields, owning teams), so nobody has to interrogate a business user about systems she's never heard of. Five quality gates run, including a real duplicate check against past work. The ticket routes with a written explanation and a price on the delay: 3 days × 12 months is 288 hours a year of someone's working life.
+You type the ask in plain words. It builds the requirement live — what it extracted, what it inferred from precedent, what it assumed and why — and asks at most seven questions, a budget enforced in code, not in a prompt. You confirm. It then discovers the backend context on its own (SAP tables, custom Z-fields, owning teams), so nobody has to quiz a business user about systems she's never heard of. Five quality gates run, including a real duplicate check against past work. The ticket routes with a written explanation and a price on the delay: 3 days × 12 months is 288 hours a year of someone's working life.
 
 One rule holds it together: the LLM proposes, deterministic code decides. Budgets, merges, gates, routing — plain Python, pinned by tests. The model cannot overwrite a human's answer. Ever.
 
