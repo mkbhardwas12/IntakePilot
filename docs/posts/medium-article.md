@@ -37,11 +37,21 @@ The rule underneath all of this is deliberately strict:
 
 The model can suggest structured output, questions, acceptance criteria, and rubric scores. It does not own the budget, overwrite human edits, mutate confirmed facts, or decide whether a requirement passes a deterministic invariant.
 
+## From one sentence to a developer's diff
+
+The chain IntakePilot is built around looks like this.
+
+A requester describes the need in their own words, in the web UI or through a Slack/Teams adapter. If a business analyst joins the loop — and on bigger asks they should — their corrections are not side conversations that evaporate: every edit at confirmation is captured as a structured diff with provenance, which is exactly the material the system learns from. A functional reviewer sees the same object the requester produced, original ask preserved verbatim, every inference labeled as an inference, and confirms or corrects it in minutes instead of scheduling a workshop.
+
+On confirmation the requirement is enriched with discovered backend context, gated, priced, and routed. The routed ticket is designed to land in the project-management tool carrying two artifacts: the structured business requirement, human-readable with its full provenance trail, and a generated implementation scaffold that an AI coding tool can consume directly. The developer reviews a diff against a requirement, instead of reverse-engineering intent from a two-line ticket.
+
+Where that stands today: tickets emit to a local repo or GitHub issues through the `Target` protocol, and they already carry the requirement, Given/When/Then acceptance criteria, auto-discovered system context, an impact section, and a cost-of-delay figure. Jira and Azure DevOps are the same one-class integration, next on the list. The Builder Agent, the piece that attaches the code scaffold automatically, is specified in the build plan's later milestones. The contract that matters is enforced now: everyone in the chain reads the same requirement, each in their own rendering, and nothing silently rewrites it.
+
 ## The shipped architecture
 
-![IntakePilot architecture](../assets/architecture.png)
+![IntakePilot architecture, isometric view: four layers — clients, deterministic core, provider protocols, ledgers — with the learning return channel.](../assets/architecture-3d.png)
 
-The architecture is built around portability and control.
+*The full engineering sheet, same layers with more detail, lives in the repo as `docs/assets/architecture.png`.*
 
 The frontend is a React + TypeScript + Vite app. It streams the intake loop over Server-Sent Events so the requester sees the draft evolve as answers arrive. The UI includes the chat, question chips, readiness, provenance badges, confirmation edits, gate results, routing explanation, and metrics surfaces.
 
@@ -64,7 +74,17 @@ Provider protocols isolate every external dependency:
 - `SystemConnector` for backend/entity discovery
 - `Target` for local repo output today and issue trackers as the integration boundary
 
-That means the same code path can run in a five-minute local mock demo, on a laptop with Ollama, on an internal GPU server, or against a governed OpenAI-compatible endpoint. The model is a deployment choice, not a business-logic dependency. And enabling your own AI is configuration, not integration work: set the endpoint, the API key, and the model name, restart, and `/health` reports which model is answering. If your model policy changes next quarter, you change three environment variables and nothing else. Structured outputs are schema-validated with retry no matter which provider is behind them, so switching models never risks a corrupted draft. Tests pin this: every provider, including the hybrid escalation pair, can be enabled from environment variables alone.
+No business logic imports a provider SDK; a test fails the build if one does. That means the same code path runs in a five-minute local mock demo, on a laptop with Ollama, on an internal GPU server, or against a governed OpenAI-compatible endpoint.
+
+## Whose AI? Yours
+
+Token economics decide more AI architecture than anyone admits. An intake conversation is chatty: extraction, gap analysis, question ranking, rubric scoring, acceptance criteria. Pay frontier-API prices for every one of those calls, multiplied by every requirement in a large organization, and the pilot that looked cheap in a demo becomes a line item someone eventually kills. Run the same calls on your own hardware and the marginal cost of a smarter intake rounds to electricity.
+
+Cost is the smaller half of the argument. Requirements are some of the most sensitive text an enterprise produces: they describe what is broken, what is planned, and where the competitive edges are. Plenty of companies, especially in the SAP world where staying on-premise is a deliberate strategy rather than a lag, will not send that text to an external API — and should not have to. IntakePilot treats that as a first-class deployment, not a compromise: Ollama or vLLM inside your network, SQLite or Postgres underneath, nothing leaves.
+
+Enabling whichever model you are allowed to use is configuration, not integration work. Set the endpoint, the API key, and the model name in environment variables, restart, and `/health` reports which model is answering. If your model policy changes next quarter, you change three variables and nothing else. Structured outputs are schema-validated with retry regardless of provider, so switching models never risks a corrupted draft.
+
+There is also a hybrid mode for the honest day-one problem: a small local model may not be smart enough yet. An optional escalation tier gives hard turns exactly one attempt on a stronger model, but only after the primary's structured output fails validation twice. Local-first economics, frontier-grade interpretation where it matters. And because the learning lives in ledgers rather than weights, escalations taper as the system accumulates your organization's context — the part no frontier model has and no model swap erases. Tests pin all of it: every provider, including the escalation pair, can be enabled from environment variables alone.
 
 ## Why backend-aware enrichment matters
 
@@ -76,30 +96,42 @@ The demo connector ships with SAP-style and database-style fixtures. A business 
 
 This is especially important for SAP and other deep enterprise systems, where the business word and the backend object are rarely the same thing.
 
-## The workflow
+## The portfolio layer
 
 ![IntakePilot workflow](../assets/workflow.png)
 
 One requirement is useful. The portfolio view is where the system gets more interesting.
 
-Because confirmed requirements carry backend context, IntakePilot can detect when two different asks touch the same underlying entity. That is not necessarily a duplicate. It is a coordination signal. The system can show that two open requirements both touch the same sales-order object before the collision appears in implementation, testing, or production.
+Because confirmed requirements carry backend context, IntakePilot can detect when two different asks touch the same underlying entity. That is not necessarily a duplicate. It is a coordination signal. The system shows that two open requirements both touch the same sales-order object before the collision appears in implementation, testing, or production — on the confirmation response, on the ticket's impact section, and in a hotspot view at `/api/graph`.
 
-The ledgers also make learning explicit:
+The delay gets a price, deterministically. "Takes 3 days by hand, every month" in the requester's own words becomes arithmetic, never an LLM guess: 3 days × 12 months is 288 hours a year of someone's working life, printed on the ticket and driving a backlog-by-value view in metrics. Prioritization meetings argue about numbers on tickets instead of who spoke loudest.
+
+Each routed ticket also carries generated Given/When/Then acceptance criteria (validated LLM output that degrades gracefully when the model cannot produce it), and named stakeholders get a countersign record via the consent endpoint — so objections land before the build, not after UAT.
+
+## The learning loop
+
+The ledgers make improvement explicit:
 
 - edit diffs become future extraction examples
 - reroutes teach routing precedent
 - repeated corrections become glossary proposals
-- question outcomes influence ranking
-- corrections replay as evals
+- question outcomes influence asking order
+- corrections replay as evals, so you can measure whether today's stack would still make yesterday's mistakes
 - metrics compute throughput, duplicate catches, routing accuracy, system-KB coverage, and backlog value
 
-The learning lives in data, not fine-tuned weights. Swap the model later and the operating memory stays.
+None of this makes the AI the author of your requirements. Humans stay the authors. The system does the bookkeeping nobody has spare hands for: recording who changed what and why, keeping the document aligned with what was actually said, and replaying those corrections so the next intake starts smarter. The learning lives in data, not fine-tuned weights — swap the model later and the operating memory stays.
 
 ## How I know it works
 
 I distrust demos, including my own, so the repo carries its own evidence. There are 125 backend tests, and they are not ceremony: adversarial suites try to trick the orchestrator into overspending the question budget, overwriting a human's answer, or routing without a confirmation — the invariants hold because tests pin them, not because a prompt asks nicely. A separate live probe (`scripts/ops_check.py`) runs 31 end-to-end checks against a running API: request-type classification, budget exhaustion, duplicate-detection-then-attach, forged-input rejection, hostile strings through the whole confirm path, and the ops endpoints. TypeScript builds clean, `npm audit` reports zero vulnerabilities, and both Docker Compose paths validate.
 
 My favorite test failure so far: on its second run, the ops probe "failed" two checks — because the learning loops had already absorbed the first run's data and stopped asking questions the precedent could answer. The product outsmarted its own test. I made the probe learning-aware and kept the lesson.
+
+## The whole system in one picture
+
+![IntakePilot, labeled: business asks enter from the light side, the draft builds under a deterministic orchestrator, gates catch what should not pass, ledgers accumulate, and everything on the dark side is your own infrastructure — with one amber cable feeding corrections back.](../assets/hero-illustration-labeled.png)
+
+Plain-language asks enter from the light side. The draft builds live under a deterministic orchestrator. Gates catch what should not pass — the amber tile is the point, not a failure. The ticket and its ledgers accumulate. Everything on the dark side, model included, is your own infrastructure behind your own boundary. And the single amber cable is every correction flowing back to make the next intake smarter.
 
 ## How to try it
 
@@ -130,9 +162,9 @@ Production deployment is documented in `docs/DEPLOYMENT.md`, with local-LLM and 
 
 ## What is next
 
-The current implementation is intentionally honest about its limits. End-user SSO and multi-tenancy are not done. Jira and Azure DevOps targets are the next natural integrations. A fuller eval harness and builder-agent scaffold are planned.
+The current implementation is intentionally honest about its limits. End-user SSO and multi-tenancy are not done. Jira and Azure DevOps targets are the next natural integrations. A fuller eval harness and the builder-agent scaffold are planned.
 
-But the important foundation is working: a deterministic intake orchestrator, local-first model options, backend-aware enrichment, append-only learning ledgers, quality gates, routing explanations, and tests around the invariants.
+But the important foundation is working: a deterministic intake orchestrator, local-first model options, backend-aware enrichment, append-only learning ledgers, quality gates, routing explanations, portfolio-level collision and value signals, and tests around the invariants.
 
 For me, the interesting question is not whether an LLM can write a requirement. It is whether we can use AI to keep everyone aligned around the requirement humans actually mean.
 
