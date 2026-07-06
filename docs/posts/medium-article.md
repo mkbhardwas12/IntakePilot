@@ -6,7 +6,7 @@
 
 Why do projects with a clear BRD still deliver the wrong thing? Because the hardest part of enterprise delivery is rarely the code. It is getting one requirement to mean the same thing to five people: the requester, the business analyst, the functional team, the architect, and the developer.
 
-I keep seeing the same scene. A finance analyst says, in perfectly clear English, "our monthly vendor report takes 3 days to compile by hand." A BA turns that into a BRD — carefully, and usually well. A functional consultant reads the BRD through the lens of the modules they own. An architect scopes it against the platform. A developer implements the scoped version. Five hand-offs, five honest interpretations, and each one closes a real gap for the next person. Nobody is the villain here. The drift is structural: meaning leaks a little at every well-intentioned translation, and there are no spare hands to chase every follow-up, record every clarification, and keep the document aligned with what was actually said.
+The scene repeats across the industry, at no particular company — it is simply how large-scale delivery is structured everywhere, and it has nothing to do with talent. Picture it: a finance analyst says, in perfectly clear English, "our monthly vendor report takes 3 days to compile by hand." A BA turns that into a BRD — carefully, and usually well. A functional consultant reads the BRD through the lens of the modules they own. An architect scopes it against the platform. A developer implements the scoped version. Five hand-offs, five honest interpretations, and each one closes a real gap for the next person. Nobody is the villain here. The drift is structural: meaning leaks a little at every well-intentioned translation, and there are no spare hands to chase every follow-up, record every clarification, and keep the document aligned with what was actually said.
 
 Most teams do not need another blank template. They need the intake conversation to stay alive as structured evidence: what was said, what was inferred, what was assumed, what was corrected, what system context was discovered, and why the work was routed where it was.
 
@@ -169,3 +169,7 @@ But the important foundation is working: a deterministic intake orchestrator, lo
 For me, the interesting question is not whether an LLM can write a requirement. It is whether we can use AI to keep everyone aligned around the requirement humans actually mean.
 
 That is what IntakePilot is trying to do.
+
+---
+
+*IntakePilot is a personal, open-source side project (MIT). The scenarios in this article are generic composites of how enterprise delivery works at scale, drawn from the industry as a whole — they do not describe any specific employer, client, colleague, or project.*

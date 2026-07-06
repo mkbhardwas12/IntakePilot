@@ -24,6 +24,8 @@ Current state: 125 backend tests, a 31-check live ops probe, Docker paths from l
 
 Open source, MIT. If your intake chain loses meaning between well-intentioned hand-offs, have a look — and tell me where it's wrong.
 
+(Personal open-source project. The scenario above is an industry composite, not any employer or client.)
+
 GitHub: https://github.com/mkbhardwas12/IntakePilot
 Architecture write-up: [Medium link]
 
