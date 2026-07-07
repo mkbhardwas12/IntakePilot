@@ -12,6 +12,8 @@ Most teams do not need another blank template. They need the intake conversation
 
 That is the job of IntakePilot.
 
+I have gained a lot from this community over the years. Open-sourcing IntakePilot is one small way of giving back.
+
 GitHub: [github.com/mkbhardwas12/IntakePilot](https://github.com/mkbhardwas12/IntakePilot)
 
 ## The product idea
