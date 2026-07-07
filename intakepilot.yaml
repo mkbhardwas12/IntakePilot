@@ -47,6 +47,10 @@ targets:
   github:
     repo: ""            # "org/repo" — required for the github target
     token_env: GITHUB_TOKEN
+  jira:
+    base_url: ""        # https://yourorg.atlassian.net (or JIRA_BASE_URL)
+    project: ""         # e.g. INTAKE (or JIRA_PROJECT_KEY)
+    issue_type: Task    # JIRA_EMAIL + JIRA_API_TOKEN supply credentials
 
 # Static by default (spec 6.1: 3/turn, 7 total). Set dynamic: true to scale
 # the total with blast radius — trivial asks get `floor` questions, multi-

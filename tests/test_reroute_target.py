@@ -24,7 +24,7 @@ def test_target_factory_wires_github_from_config():
     target = make_target(cfg)
     assert isinstance(target, GitHubTarget) and target.repo == "org/repo"
     with pytest.raises(ValueError):
-        make_target(Config(target_provider="jira"))
+        make_target(Config(target_provider="not-a-target"))
 
 
 @pytest.fixture

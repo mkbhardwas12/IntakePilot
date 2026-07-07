@@ -18,4 +18,7 @@ def make_target(cfg: Config):
     if name == "github":
         from core.targets.github import GitHubTarget
         return GitHubTarget(conf)
+    if name == "jira":
+        from core.targets.jira import JiraTarget
+        return JiraTarget(conf)
     raise ValueError(f"unknown target provider: {name}")

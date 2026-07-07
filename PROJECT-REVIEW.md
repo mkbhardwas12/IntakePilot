@@ -7,7 +7,7 @@
 > atomic vector-index persistence, the GitHub target wired via
 > `INTAKEPILOT_TARGET`, and the medium/low lists are largely addressed
 > (typed request bodies, gate-4 grounded in real known work, evals that
-> replay the edit ledger). Current state: 117 passing tests plus
+> replay the edit ledger). Current state: 136 passing tests plus
 > `scripts/ops_check.py`, a 31-check live-API sweep. Remaining honest gaps
 > are tracked in README "What's implemented vs. spec'd for later".
 

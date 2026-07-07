@@ -310,8 +310,8 @@ Implemented and verified (spec milestones 1–5 core, plus gates/routing from 6)
   `core/agents/orchestrator.py` — the spec omits one)
 - Confirmation with edit-diff capture, exemplar selection/injection (7.2)
 - Five-gate pipeline (1 & 3 deterministic; 2/4/5 LLM-rubric), routing
-  classifier with explanation, ticket targets: local repo (default) or
-  GitHub issues via `provider.target` / `INTAKEPILOT_TARGET`
+  classifier with explanation, ticket targets: local repo (default),
+  GitHub issues, or Jira Cloud via `provider.target` / `INTAKEPILOT_TARGET`
 - `/api/metrics` computing Section 9 metrics from the ledgers (plus
   system-KB counts, escalation rate, duplicate catch rate, and routing
   accuracy from reroute ground truth)
@@ -349,11 +349,12 @@ Implemented and verified (spec milestones 1–5 core, plus gates/routing from 6)
 
 Spec'd for later (honest gaps):
 
-- Milestone 6 remainder: triage queue UI (GitHub target + label-reroute
-  webhook are shipped; full status sync is not)
-- Milestone 7: eval harness over a 40-scenario golden set (scenario #1 ships
-  in `evals/golden/` and runs as a pytest), nightly distillation jobs,
-  `prompt_configs` promotion gate
+- Milestone 6 remainder: triage queue UI (GitHub + Jira targets, label-reroute
+  webhooks and the Jira issue-done -> delivered outcome sync are shipped;
+  full bidirectional status sync is not)
+- Milestone 7 remainder: nightly distillation jobs, `prompt_configs`
+  promotion gate (the 40-scenario golden harness ships: `python -m
+  evals.harness` scores any provider; invariants gate every test run)
 - Milestone 8: precedent backfill from targets, clone-and-modify UX, glossary
   importer CLI (a seed glossary ships for the demo)
 - Milestones 9–10: Bedrock/DynamoDB/Bedrock-KB providers, SAM template,
@@ -368,7 +369,7 @@ Matches spec Section 3: `core/` (api, agents+prompts, gates, learning
 {exemplars, proposals, replay}, providers/{llm,store,vector,connector},
 targets, schemas, models.py, config.py), `web/`, `deploy/` (docker-compose +
 Dockerfiles + nginx), `scripts/` (ops_check.py live-API readiness sweep),
-`tests/` (117 tests: invariants, e2e, per-feature suites), `evals/golden/`,
+`tests/` (136 tests: invariants, e2e, golden set, per-feature suites), `evals/golden/`,
 `docs/`, `examples/demo-repo/`.
 
 ## License

@@ -17,11 +17,12 @@ import re
 from fastapi import APIRouter, HTTPException, Request
 
 from core.api.requirements import apply_reroute
-from core.api.security import verify_github_signature
+from core.api.security import verify_github_signature, verify_jira_token
 
 router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
 
 _REQ_ID = re.compile(r"IPR-\d{4}-\d{6}")
+_REQ_LABEL = re.compile(r"^ipr-\d{4}-\d{6}$")
 
 
 @router.post("/github")
@@ -48,3 +49,61 @@ async def github(request: Request):
         # never 4xx back at GitHub or it may disable the hook.
         return {"processed": False, "reason": exc.detail}
     return {"processed": True, **result}
+
+
+@router.post("/jira")
+async def jira(request: Request):
+    """Jira Cloud `jira:issue_updated` events close two loops:
+
+    * a queue relabel (`intake-<queue>`) is routing ground truth → reroute,
+      exactly like the GitHub label handler;
+    * a status move whose category is Done is the delivery terminal state →
+      an outcome_ledger `delivered` row, the ground truth behind cycle-time
+      and hours-displaced metrics.
+    """
+    verify_jira_token(request)
+    try:
+        payload = json.loads(await request.body())
+    except json.JSONDecodeError:
+        raise HTTPException(422, "invalid JSON payload")
+
+    issue = payload.get("issue") or {}
+    fields = issue.get("fields") or {}
+    labels = [l for l in (fields.get("labels") or []) if isinstance(l, str)]
+    req_id = next((l.upper() for l in labels if _REQ_LABEL.match(l)), None)
+    if not req_id:
+        return {"processed": False, "reason": "no requirement label on issue"}
+
+    ctx = request.app.state.ctx
+    changes = ((payload.get("changelog") or {}).get("items")) or []
+
+    for item in changes:
+        if item.get("field") == "labels":
+            before = set((item.get("fromString") or "").split())
+            after = set((item.get("toString") or "").split())
+            added = [l for l in after - before if l.startswith("intake-")]
+            if added:
+                try:
+                    result = await apply_reroute(
+                        ctx, req_id, added[0].removeprefix("intake-"))
+                except HTTPException as exc:
+                    return {"processed": False, "reason": exc.detail}
+                return {"processed": True, "event": "reroute", **result}
+
+    for item in changes:
+        if item.get("field") == "status":
+            done = ((fields.get("status") or {}).get("statusCategory")
+                    or {}).get("key") == "done"
+            if done:
+                try:
+                    await ctx.store.latest(req_id)
+                except KeyError:
+                    return {"processed": False, "reason": "unknown requirement"}
+                await ctx.store.log("outcome_ledger", {
+                    "req_id": req_id, "stage": "delivered", "verdict": "closed",
+                    "detail": {"issue": issue.get("key"),
+                               "status": item.get("toString")}})
+                return {"processed": True, "event": "delivered",
+                        "req_id": req_id}
+
+    return {"processed": False, "reason": "no queue relabel or done transition"}

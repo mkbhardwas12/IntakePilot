@@ -38,3 +38,17 @@ def verify_github_signature(request: Request, body: bytes) -> None:
                                     hashlib.sha256).hexdigest()
     if not hmac.compare_digest(signature, expected):
         raise HTTPException(401, "invalid webhook signature")
+
+
+def verify_jira_token(request: Request) -> None:
+    """Jira Cloud webhooks can't sign payloads; a shared token travels in the
+    URL (`?token=`) or the `X-IntakePilot-Token` header instead. Set
+    `INTAKEPILOT_JIRA_WEBHOOK_SECRET` to enforce it; unset keeps the demo
+    posture (front with your reverse proxy)."""
+    secret = os.environ.get("INTAKEPILOT_JIRA_WEBHOOK_SECRET", "")
+    if not secret:
+        return
+    supplied = (request.query_params.get("token")
+                or request.headers.get("X-IntakePilot-Token", ""))
+    if not hmac.compare_digest(supplied, secret):
+        raise HTTPException(401, "invalid webhook token")

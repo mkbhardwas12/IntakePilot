@@ -38,7 +38,7 @@ flowchart TB
 
 A business user describes a need in plain language. IntakePilot builds a structured requirement live (the Shadow Draft), resolves gaps by inference and precedent *before* asking anything, and asks at most 3 questions per turn, 7 total — enforced in code, not in a prompt. After the human confirms, an enrichment step auto-discovers backend context (systems, tables, custom fields) so the requester is never asked a technical question, five quality gates run, and the requirement is routed to the right team queue with a written explanation and a ticket.
 
-From there the flow extends into the delivery chain: the ticket lands in a project-management tool (Jira, Azure DevOps — the `Target` protocol makes this a one-class integration) carrying **two artifacts: the structured business requirement and a generated implementation scaffold.** An AI coding agent can consume that enriched ticket directly; a developer reviews and ships. Everyone in the chain — requester, business analyst (optional), functional reviewer, tech lead, developer — sees the *same* requirement, each in their own rendering.
+From there the flow extends into the delivery chain: the ticket lands in a project-management tool (Jira Cloud ships as a target; Azure DevOps is the same one-class integration) carrying **two artifacts: the structured business requirement and a generated implementation scaffold.** An AI coding agent can consume that enriched ticket directly; a developer reviews and ships. Everyone in the chain — requester, business analyst (optional), functional reviewer, tech lead, developer — sees the *same* requirement, each in their own rendering.
 
 The loop closes through the learning ledger: every human correction at confirmation is captured as an `edit_diffs` row and re-injected as an exemplar into future extraction prompts. The system gets better with use, with any model, because the learning lives in data, not in fine-tuned weights.
 
@@ -132,9 +132,10 @@ No business logic imports a provider SDK — a lint test fails the build if one 
 | `GET /api/evals/replay` · `GET /api/glossary/proposals` · `POST /api/glossary` | admin token | corrections-as-evals; mined glossary proposals; human accept |
 | `POST /api/channels/inbound` | admin token (bot credential) | Slack/Teams/mail adapter — plain-text turn loop |
 | `POST /api/webhooks/github` | HMAC `X-Hub-Signature-256` | label-change reroute feedback |
+| `POST /api/webhooks/jira` | shared token (`?token=` / header) | queue-relabel reroute; issue-done → `delivered` outcome |
 
 "Admin token" = `INTAKEPILOT_ADMIN_TOKEN`; unset (demo posture) these surfaces stay open, set it and every one of them requires `Authorization: Bearer` (constant-time compare).
 
 ## Trust boundaries and current limits
 
-There is **no end-user SSO yet** — requirements are bound to their creating session (`X-Session-Id`, anti-enumeration 404s), one bearer token (`INTAKEPILOT_ADMIN_TOKEN`) closes every admin/ops surface, and the GitHub webhook verifies `X-Hub-Signature-256` — but user identity remains your reverse proxy's job (`docs/DEPLOYMENT.md`, security checklist). Multi-tenancy, the Jira/ADO target, the full 40-scenario eval harness, and the Builder Agent (the component that will attach generated code scaffolds to tickets automatically) are specified in the build spec's later milestones; `PROJECT-REVIEW.md` tracks the honest gap list.
+There is **no end-user SSO yet** — requirements are bound to their creating session (`X-Session-Id`, anti-enumeration 404s), one bearer token (`INTAKEPILOT_ADMIN_TOKEN`) closes every admin/ops surface, the GitHub webhook verifies `X-Hub-Signature-256`, and the Jira webhook a shared token (`INTAKEPILOT_JIRA_WEBHOOK_SECRET`) — but user identity remains your reverse proxy's job (`docs/DEPLOYMENT.md`, security checklist). Multi-tenancy, the ADO target, and the Builder Agent (the component that will attach generated code scaffolds to tickets automatically) are specified in the build spec's later milestones; `PROJECT-REVIEW.md` tracks the honest gap list.
