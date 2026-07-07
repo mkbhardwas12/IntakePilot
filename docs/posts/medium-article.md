@@ -39,6 +39,20 @@ The rule underneath all of this is deliberately strict:
 
 The model can suggest structured output, questions, acceptance criteria, and rubric scores. It does not own the budget, overwrite human edits, mutate confirmed facts, or decide whether a requirement passes a deterministic invariant.
 
+## Who does what, in plain words
+
+If the sections below get technical, here is the whole thing as a day at the office.
+
+**The business user** — say a finance analyst — types what she needs the way she would say it to a colleague: "our monthly vendor report takes 3 days to compile by hand." The tool asks at most seven short questions, in business language. She watches the request take shape beside the chat, fixes anything it misunderstood, and clicks confirm. Total effort: a few minutes, once. She is never asked which database anything lives in — that is the tool's homework, not hers.
+
+**The business analyst** (optional — bigger asks deserve one) opens the same request and sees three kinds of statements, each labeled: what the requester actually said, what the tool inferred from past requests, and what it assumed. The BA corrects whatever is off. Every correction is remembered, so next month's similar request arrives pre-corrected. The BA starts from a solid draft instead of a blank template, and their time goes into judgment instead of collection.
+
+**The functional reviewer or product owner** receives the request with the homework attached: which systems it touches (discovered automatically), what doing nothing costs in hours per year (computed from the requester's own words), whether any other open request touches the same objects, and a done-checklist in given/when/then form. Priority conversations happen over numbers on the page rather than gut feel.
+
+**The delivery team and developer** find a ticket in the tool they already use — GitHub or Jira — carrying the original ask word for word, the discovered system context, and the acceptance checklist. If the ticket landed with the wrong team, they simply relabel it; the router learns from that and gets it right next time. When they close the ticket, the system records the delivery, so the benefit numbers are measured, not claimed.
+
+**Setting it up** is IT work, not a project: one small web application running inside your own network. Pick where tickets land (GitHub or Jira), pick which AI answers (a built-in offline one for trying it out, any model your company allows for real use), and put it behind your company sign-in. Nobody's job changes. The paperwork between the jobs is what changes.
+
 ## From one sentence to a developer's diff
 
 The chain IntakePilot is built around looks like this.
@@ -128,6 +142,8 @@ None of this makes the AI the author of your requirements. Humans stay the autho
 I distrust demos, including my own, so the repo carries its own evidence. There are 125 backend tests, and they are not ceremony: adversarial suites try to trick the orchestrator into overspending the question budget, overwriting a human's answer, or routing without a confirmation — the invariants hold because tests pin them, not because a prompt asks nicely. A separate live probe (`scripts/ops_check.py`) runs 31 end-to-end checks against a running API: request-type classification, budget exhaustion, duplicate-detection-then-attach, forged-input rejection, hostile strings through the whole confirm path, and the ops endpoints. TypeScript builds clean, `npm audit` reports zero vulnerabilities, and both Docker Compose paths validate.
 
 My favorite test failure so far: on its second run, the ops probe "failed" two checks — because the learning loops had already absorbed the first run's data and stopped asking questions the precedent could answer. The product outsmarted its own test. I made the probe learning-aware and kept the lesson.
+
+In plain words, for non-developers: every time the code changes, a robot user replays about forty realistic requests — bug reports, data requests, new ideas, one deliberately vague ask, and two in German — through the entire journey from typed sentence to routed ticket, and the run fails loudly if any promise breaks: never more than seven questions, never a technical question to a business person, never a machine overwriting a human's answer, never routing without a human's confirmation. And what is deliberately not in the box yet, so nobody is surprised in a pilot: its own login screen (your IT fronts it with company sign-in), serving multiple separate companies from one install, Azure DevOps tickets, and the automatic code-scaffold attachment. Those are on the roadmap, in the open.
 
 ## The whole system in one picture
 
