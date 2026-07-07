@@ -1,6 +1,6 @@
 # LinkedIn Post
 
-*(Attach `docs/assets/hero-illustration.png` first — the text-free hero; paste the caption from `docs/assets/thumbnail-brief.md` §4 under it. Attach `docs/assets/architecture.png` second for the technical audience. `docs/assets/hero-illustration-labeled.png` is the numbered/legend variant for slides or the README. After the Medium article is published, replace `[Medium link]` with the real URL.)*
+*(Attach `docs/assets/hero-illustration.png` first — the text-free hero; paste the caption from `docs/assets/thumbnail-brief.md` §4 under it. Attach `docs/assets/architecture.png` second for the technical audience. `docs/assets/hero-illustration-labeled.png` is the numbered/legend variant for slides or the README. The Medium short link redirects to the published article automatically.)*
 
 ---
 
@@ -27,6 +27,6 @@ Open source, MIT. If your intake chain loses meaning between well-intentioned ha
 (Personal open-source project. The scenario above is an industry composite, not any employer or client.)
 
 GitHub: https://github.com/mkbhardwas12/IntakePilot
-Architecture write-up: [Medium link]
+Architecture write-up: https://medium.com/p/2267d1ea9ec0
 
 #EnterpriseAI #OpenSource #LocalLLM #RequirementsEngineering #SAP
