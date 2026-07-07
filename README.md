@@ -16,8 +16,20 @@ Built from `docs/build-specification.txt` (v1.0) plus
 `docs/ADDENDUM-01-backend-aware-enrichment.md`. See `docs/SPEC-REVIEW.md`
 for an honest review of the spec and the choices made where it was silent.
 
+## Quick look
+
+One intake, end to end — real UI, offline mock model, 23 seconds:
+
+![IntakePilot demo: plain-language ask to routed ticket](docs/assets/demo.gif)
+
+*A plain-language ask becomes a live Shadow Draft with provenance badges;
+two batched questions; confirm; five gates; routed to `data-platform` with
+a written explanation and a ticket. Higher-quality video:
+[docs/assets/demo.mp4](docs/assets/demo.mp4).*
+
 ## Contents
 
+- [Quick look](#quick-look)
 - [How it works](#how-it-works)
 - [Who uses it, and how](#who-uses-it-and-how)
 - [The five-minute first run](#the-five-minute-first-run)
