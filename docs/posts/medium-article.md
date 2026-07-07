@@ -151,6 +151,22 @@ In plain words, for non-developers: every time the code changes, a robot user re
 
 Plain-language asks enter from the light side. The draft builds live under a deterministic orchestrator. Gates catch what should not pass — the amber tile is the point, not a failure. The ticket and its ledgers accumulate. Everything on the dark side, model included, is your own infrastructure behind your own boundary. And the single amber cable is every correction flowing back to make the next intake smarter.
 
+## How you can use it for your own use case
+
+Map it to whatever your intake pain looks like.
+
+**If your team drowns in report and data requests** — point requesters at the chat instead of your inbox. You get deduplicated, prioritized requests with the fields your data team actually needs (sources, refresh cadence, sensitivity), and a backlog sorted by hours saved per year.
+
+**If bugs arrive as chat messages** — the same door recognizes a bug on the first sentence and captures what is broken versus what should happen, so triage starts from facts instead of a reconstruction.
+
+**If you run SAP or any deep platform** — teach it your vocabulary once (the glossary and system connector are plain YAML plus a three-method interface), and every future request arrives with tables, custom fields, and owning teams already attached.
+
+**If you are piloting AI coding tools** — this is where development genuinely speeds up. An agent is only as good as the ticket you hand it; these tickets carry the business intent verbatim, given/when/then acceptance criteria, and discovered system context — exactly the inputs a coding agent needs to produce a useful first version instead of a guess. Fewer clarification loops, less rework, faster from ask to diff.
+
+**If your teams, fields, and queues look different** — everything that varies is configuration: slot schemas are YAML files you can extend per request type, routing queues and their keywords are one config block, and the golden-scenario harness lets you replay your own real requests as a test before rolling anything out.
+
+Adapting it is a config exercise first, and a coding exercise only at the edges.
+
 ## How to try it
 
 The fastest path uses the deterministic mock model and SQLite:
