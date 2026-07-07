@@ -1,0 +1,25 @@
+id: scenario_004
+ask: the quarterly headcount report takes 3 days to build by hand from Workday
+requester:
+  name: Golden User
+  dept: HR
+  role: HR Partner
+scripted_answers:
+  urgency: this quarter
+  success_criteria: headcount numbers refresh automatically
+  data_fields: headcount by org, joiners, leavers
+  refresh_frequency: quarterly
+  data_sensitivity: confidential
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    business_outcome:
+      provenance: extracted
+    affected_systems:
+      contains: Workday
+    urgency:
+      value: this quarter
+  routing_queue: data-platform
+  request_type: data_request
+notes: HR data sensitivity

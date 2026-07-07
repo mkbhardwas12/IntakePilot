@@ -1,0 +1,20 @@
+id: scenario_021
+ask: the month-end batch process no longer runs, it used to work before the upgrade
+requester:
+  name: Golden User
+  dept: Finance Ops
+  role: Controller
+scripted_answers:
+  urgency: this week
+  expected_behavior: batch completes nightly as before
+  success_criteria: job green five nights in a row
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    current_behavior:
+      provenance: extracted
+    urgency:
+      value: this week
+  routing_queue: internal-tools
+  request_type: bug_report

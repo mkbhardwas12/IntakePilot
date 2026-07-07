@@ -1,0 +1,20 @@
+id: scenario_032
+ask: automate stockout notification workflow to account owners from inventory levels
+requester:
+  name: Golden User
+  dept: Sales Ops
+  role: Manager
+scripted_answers:
+  urgency: this month
+  success_criteria: owners notified within 1 hour of stockout
+  scope_boundaries: A-class products
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    business_outcome:
+      provenance: extracted
+    urgency:
+      value: this month
+  routing_queue: internal-tools
+  request_type: new_capability

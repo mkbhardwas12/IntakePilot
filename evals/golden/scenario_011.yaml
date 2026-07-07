@@ -1,0 +1,23 @@
+id: scenario_011
+ask: the overdue receivables report takes 1 day to compile by hand from Oracle
+requester:
+  name: Golden User
+  dept: Finance Ops
+  role: AR Clerk
+scripted_answers:
+  urgency: this week
+  success_criteria: overdue list auto-generated every morning
+  data_fields: customer, amount, days overdue
+  refresh_frequency: daily
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    business_outcome:
+      provenance: extracted
+    affected_systems:
+      contains: Oracle
+    urgency:
+      value: this week
+  routing_queue: data-platform
+  request_type: data_request

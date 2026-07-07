@@ -1,0 +1,22 @@
+id: scenario_033
+ask: build an api feed that syncs new joiners from Workday into our directory
+requester:
+  name: Golden User
+  dept: HR
+  role: HRIS Lead
+scripted_answers:
+  urgency: this quarter
+  success_criteria: accounts exist on day one for every joiner
+  data_sensitivity: confidential
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    business_outcome:
+      provenance: extracted
+    affected_systems:
+      contains: Workday
+    urgency:
+      value: this quarter
+  routing_queue: integrations
+  request_type: new_capability

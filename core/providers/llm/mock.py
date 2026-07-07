@@ -59,6 +59,16 @@ def _extract_slots(message: str) -> dict:
         slots["current_behavior"] = {"value": text.rstrip("."), "confidence": 0.7}
         slots["expected_behavior"] = {
             "value": f"Able to {capability} again", "confidence": 0.7}
+    elif (failure := re.search(
+            r"(.{4,}?)\s+(?:fails?\b|is broken\b|broke\b|crash(?:es|ed)?\b|"
+            r"errors? out\b|stopped(?: working| running)?\b|"
+            r"no longer (?:runs|works)\b|(?:shows?|applies)\s+(?:the\s+)?wrong\b)", low)):
+        subject = failure.group(1).strip().lstrip("the ").strip(" ,;")
+        slots["business_outcome"] = {
+            "value": f"Fix: {subject} is failing", "confidence": 0.7}
+        slots["current_behavior"] = {"value": text.rstrip("."), "confidence": 0.7}
+        slots["expected_behavior"] = {
+            "value": f"{subject} works reliably again", "confidence": 0.65}
     elif manual:
         slots["business_outcome"] = {
             "value": f"Automate a manual process: {text.rstrip('.')}",

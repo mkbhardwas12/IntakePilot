@@ -1,0 +1,22 @@
+id: scenario_034
+ask: build a quote configuration tool this quarter, reps assemble quotes manually in Excel at present
+requester:
+  name: Golden User
+  dept: Sales Ops
+  role: Pre-sales
+scripted_answers:
+  urgency: this quarter
+  success_criteria: quote turnaround under 1 day
+  scope_boundaries: standard products only
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    business_outcome:
+      provenance: extracted
+    affected_systems:
+      contains: Excel
+    urgency:
+      value: this quarter
+  routing_queue: internal-tools
+  request_type: new_capability

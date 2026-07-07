@@ -1,0 +1,20 @@
+id: scenario_036
+ask: automate the 8D report workflow, at present evidence is collected by hand
+requester:
+  name: Golden User
+  dept: Quality
+  role: Manager
+scripted_answers:
+  urgency: this quarter
+  success_criteria: 8D cycle time cut in half
+  scope_boundaries: customer complaints only
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    business_outcome:
+      provenance: extracted
+    urgency:
+      value: this quarter
+  routing_queue: internal-tools
+  request_type: new_capability

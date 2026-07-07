@@ -1,0 +1,20 @@
+id: scenario_030
+ask: build an api integration that feeds carrier tracking events into our order status
+requester:
+  name: Golden User
+  dept: Logistics
+  role: Manager
+scripted_answers:
+  urgency: this quarter
+  success_criteria: customers see live status without calling
+  scope_boundaries: top 3 carriers first
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    business_outcome:
+      provenance: extracted
+    urgency:
+      value: this quarter
+  routing_queue: integrations
+  request_type: new_capability

@@ -1,0 +1,20 @@
+id: scenario_027
+ask: the audit log export is broken, compliance cannot pull last quarter
+requester:
+  name: Golden User
+  dept: IT Ops
+  role: Analyst
+scripted_answers:
+  urgency: this month
+  expected_behavior: audit export covers any date range
+  success_criteria: compliance signs off on Q2 export
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    current_behavior:
+      provenance: extracted
+    urgency:
+      value: this month
+  routing_queue: platform-security
+  request_type: bug_report

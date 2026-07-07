@@ -1,0 +1,20 @@
+id: scenario_018
+ask: the offer letter workflow is broken, approvals never arrive
+requester:
+  name: Golden User
+  dept: HR
+  role: Recruiter
+scripted_answers:
+  urgency: this week
+  expected_behavior: approvers get the task within minutes
+  success_criteria: offers approved within one day
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    current_behavior:
+      provenance: extracted
+    urgency:
+      value: this week
+  routing_queue: internal-tools
+  request_type: bug_report

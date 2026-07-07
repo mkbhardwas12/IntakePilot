@@ -1,0 +1,21 @@
+id: scenario_009
+ask: the quality trend report takes 2 days to compile by hand for every review
+requester:
+  name: Golden User
+  dept: Quality
+  role: Quality Engineer
+scripted_answers:
+  urgency: this month
+  success_criteria: defect trends refresh without manual steps
+  data_fields: defect class, line, disposition
+  refresh_frequency: weekly
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    business_outcome:
+      provenance: extracted
+    urgency:
+      value: this month
+  routing_queue: data-platform
+  request_type: data_request

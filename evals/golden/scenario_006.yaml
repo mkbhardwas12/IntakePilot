@@ -1,0 +1,23 @@
+id: scenario_006
+ask: the supplier spend report takes 5 days to compile by hand from SAP and Excel
+requester:
+  name: Golden User
+  dept: Procurement
+  role: Category Manager
+scripted_answers:
+  urgency: this quarter
+  success_criteria: spend by category available on demand
+  data_fields: supplier, category, PO value
+  refresh_frequency: monthly
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    business_outcome:
+      provenance: extracted
+    affected_systems:
+      contains: SAP
+    urgency:
+      value: this quarter
+  routing_queue: data-platform
+  request_type: data_request

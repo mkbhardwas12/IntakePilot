@@ -1,0 +1,22 @@
+id: scenario_026
+ask: the goods receipt process fails in SAP after last week of changes with error FI311
+requester:
+  name: Golden User
+  dept: Warehouse
+  role: Operator
+scripted_answers:
+  urgency: this week
+  expected_behavior: post goods receipts without FI311
+  success_criteria: full shift posts cleanly
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    current_behavior:
+      provenance: extracted
+    affected_systems:
+      contains: SAP
+    urgency:
+      value: this week
+  routing_queue: internal-tools
+  request_type: bug_report

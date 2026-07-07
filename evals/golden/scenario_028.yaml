@@ -1,0 +1,21 @@
+id: scenario_028
+ask: automate supplier onboarding this quarter, at present the same details are re-typed into 4 systems
+  manually
+requester:
+  name: Golden User
+  dept: Procurement
+  role: Manager
+scripted_answers:
+  urgency: this quarter
+  success_criteria: one entry propagates to all systems
+  scope_boundaries: direct materials suppliers only
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    business_outcome:
+      provenance: extracted
+    urgency:
+      value: this quarter
+  routing_queue: internal-tools
+  request_type: new_capability

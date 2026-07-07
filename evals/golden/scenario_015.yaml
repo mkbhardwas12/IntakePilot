@@ -1,0 +1,20 @@
+id: scenario_015
+ask: the invoice export fails with an error every morning since Monday
+requester:
+  name: Golden User
+  dept: Finance Ops
+  role: Analyst
+scripted_answers:
+  urgency: this week
+  expected_behavior: invoice export completes before 8am
+  success_criteria: no export errors for two weeks
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    current_behavior:
+      provenance: extracted
+    urgency:
+      value: this week
+  routing_queue: data-platform
+  request_type: bug_report

@@ -1,0 +1,23 @@
+id: scenario_008
+ask: our ticket backlog dashboard takes 3 hours to compile by hand from Zendesk
+requester:
+  name: Golden User
+  dept: Support Ops
+  role: Team Lead
+scripted_answers:
+  urgency: this month
+  success_criteria: backlog dashboard live by 9am daily
+  data_fields: open tickets, age, priority
+  refresh_frequency: daily
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    business_outcome:
+      provenance: extracted
+    affected_systems:
+      contains: Zendesk
+    urgency:
+      value: this month
+  routing_queue: data-platform
+  request_type: data_request

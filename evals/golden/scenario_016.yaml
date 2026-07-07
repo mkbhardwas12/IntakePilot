@@ -1,0 +1,23 @@
+id: scenario_016
+ask: after last week of changes I am not able to use the ticket merge tool in Zendesk
+requester:
+  name: Golden User
+  dept: Support Ops
+  role: Agent
+scripted_answers:
+  urgency: this week
+  expected_behavior: merge duplicate tickets like before
+  success_criteria: merge works on first try
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    current_behavior:
+      provenance: extracted
+    affected_systems:
+      contains: Zendesk
+    urgency:
+      value: this week
+  routing_queue: internal-tools
+  request_type: bug_report
+notes: capability-failure phrasing

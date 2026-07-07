@@ -1,0 +1,20 @@
+id: scenario_037
+ask: build the integration for the new EDI partner feed for inbound deliveries
+requester:
+  name: Golden User
+  dept: Warehouse
+  role: IT Coordinator
+scripted_answers:
+  urgency: this month
+  success_criteria: ASNs arrive electronically, no manual entry
+  scope_boundaries: one pilot partner
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    business_outcome:
+      provenance: extracted
+    urgency:
+      value: this month
+  routing_queue: integrations
+  request_type: new_capability

@@ -1,0 +1,13 @@
+id: scenario_039
+ask: unser monatlicher Lieferantenbericht dauert 3 Tage Handarbeit
+requester:
+  name: Golden User
+  dept: Finance Ops
+  role: Analyst
+scripted_answers:
+  urgency: this month
+  success_criteria: Bericht in unter 1 Stunde
+strict: false
+gold:
+  questions_asked_max: 7
+notes: German ask — the i18n gap, scored against real models

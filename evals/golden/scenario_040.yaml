@@ -1,0 +1,13 @@
+id: scenario_040
+ask: seit dem Update kann ich keine Wareneingaenge mehr buchen
+requester:
+  name: Golden User
+  dept: Warehouse
+  role: Operator
+scripted_answers:
+  urgency: this week
+  expected_behavior: Wareneingang buchen wie vorher
+strict: false
+gold:
+  questions_asked_max: 7
+notes: German capability-failure phrasing

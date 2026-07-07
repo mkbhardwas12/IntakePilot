@@ -1,0 +1,20 @@
+id: scenario_024
+ask: the pipeline dashboard is broken, it shows wrong values since Friday
+requester:
+  name: Golden User
+  dept: Sales Ops
+  role: Analyst
+scripted_answers:
+  urgency: this week
+  expected_behavior: dashboard matches Salesforce same-day
+  success_criteria: spot checks match for a week
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    current_behavior:
+      provenance: extracted
+    urgency:
+      value: this week
+  routing_queue: data-platform
+  request_type: bug_report

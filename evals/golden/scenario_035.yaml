@@ -1,0 +1,22 @@
+id: scenario_035
+ask: build a webhook integration connecting ServiceNow change requests to our deploys
+requester:
+  name: Golden User
+  dept: IT Ops
+  role: Platform Lead
+scripted_answers:
+  urgency: this quarter
+  success_criteria: deploys blocked without approved change
+  scope_boundaries: production deploys only
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    business_outcome:
+      provenance: extracted
+    affected_systems:
+      contains: ServiceNow
+    urgency:
+      value: this quarter
+  routing_queue: integrations
+  request_type: new_capability

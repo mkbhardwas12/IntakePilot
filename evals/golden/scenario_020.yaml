@@ -1,0 +1,20 @@
+id: scenario_020
+ask: the carrier tracking sync stopped, shipments no longer update from the api feed
+requester:
+  name: Golden User
+  dept: Logistics
+  role: Dispatcher
+scripted_answers:
+  urgency: this week
+  expected_behavior: tracking events flow within 15 minutes
+  success_criteria: no stale shipments older than 1 hour
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    current_behavior:
+      provenance: extracted
+    urgency:
+      value: this week
+  routing_queue: integrations
+  request_type: bug_report

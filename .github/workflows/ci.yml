@@ -19,6 +19,8 @@ jobs:
           cache: pip
       - run: pip install -r requirements-dev.txt
       - run: python -m pytest -q
+      - name: Golden-set eval report (mock baseline)
+        run: python -m evals.harness
 
   web:
     runs-on: ubuntu-latest

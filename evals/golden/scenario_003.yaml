@@ -1,0 +1,23 @@
+id: scenario_003
+ask: the month-end close report pack takes 4 days to compile by hand out of SAP
+requester:
+  name: Golden User
+  dept: Finance Ops
+  role: Controller
+scripted_answers:
+  urgency: this quarter
+  success_criteria: close pack ready in under 1 day
+  data_fields: P&L, balance sheet, variance
+  refresh_frequency: monthly
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    business_outcome:
+      provenance: extracted
+    affected_systems:
+      contains: SAP
+    urgency:
+      value: this quarter
+  routing_queue: data-platform
+  request_type: data_request

@@ -1,0 +1,20 @@
+id: scenario_031
+ask: create an approval workflow for credit limit changes this quarter, at present it is all email chains
+requester:
+  name: Golden User
+  dept: Finance Ops
+  role: Treasurer
+scripted_answers:
+  urgency: this quarter
+  success_criteria: every change has an auditable approval
+  scope_boundaries: limits above 50k only
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    business_outcome:
+      provenance: extracted
+    urgency:
+      value: this quarter
+  routing_queue: internal-tools
+  request_type: new_capability

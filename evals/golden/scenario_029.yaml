@@ -1,0 +1,20 @@
+id: scenario_029
+ask: build a customer portal for return requests instead of email back and forth
+requester:
+  name: Golden User
+  dept: Support Ops
+  role: Manager
+scripted_answers:
+  urgency: this quarter
+  success_criteria: half of returns filed via portal in month one
+  scope_boundaries: EU customers first
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    business_outcome:
+      provenance: extracted
+    urgency:
+      value: this quarter
+  routing_queue: internal-tools
+  request_type: new_capability

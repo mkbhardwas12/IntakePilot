@@ -1,0 +1,13 @@
+id: scenario_038
+ask: things are slow and everyone is frustrated with the numbers
+requester:
+  name: Golden User
+  dept: Finance Ops
+  role: Analyst
+scripted_answers:
+  urgency: this month
+  success_criteria: agreed definition of the numbers everyone trusts
+strict: false
+gold:
+  questions_asked_max: 7
+notes: deliberately vague — measures question quality, not extraction

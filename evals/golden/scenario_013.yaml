@@ -1,0 +1,23 @@
+id: scenario_013
+ask: our churn metric takes 3 days to compile by hand from Salesforce exports
+requester:
+  name: Golden User
+  dept: Sales Ops
+  role: Rev Ops
+scripted_answers:
+  urgency: this month
+  success_criteria: churn metric trusted and refreshed weekly
+  data_fields: logo churn, revenue churn, cohort
+  refresh_frequency: weekly
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    business_outcome:
+      provenance: extracted
+    affected_systems:
+      contains: Salesforce
+    urgency:
+      value: this month
+  routing_queue: data-platform
+  request_type: data_request

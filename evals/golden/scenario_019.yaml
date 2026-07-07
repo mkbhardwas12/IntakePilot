@@ -1,0 +1,20 @@
+id: scenario_019
+ask: depot users cannot login since the security patch, access denied errors
+requester:
+  name: Golden User
+  dept: IT Ops
+  role: Sysadmin
+scripted_answers:
+  urgency: this week
+  expected_behavior: depot users sign in with existing accounts
+  success_criteria: zero login failures for depot group
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    current_behavior:
+      provenance: extracted
+    urgency:
+      value: this week
+  routing_queue: platform-security
+  request_type: bug_report

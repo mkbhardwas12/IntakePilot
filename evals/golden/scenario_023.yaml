@@ -1,0 +1,20 @@
+id: scenario_023
+ask: the inspection tool crashes when I attach a photo, error since the new release
+requester:
+  name: Golden User
+  dept: Quality
+  role: Inspector
+scripted_answers:
+  urgency: this week
+  expected_behavior: photos attach without crashing
+  success_criteria: 50 inspections with photos, no crash
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    current_behavior:
+      provenance: extracted
+    urgency:
+      value: this week
+  routing_queue: internal-tools
+  request_type: bug_report

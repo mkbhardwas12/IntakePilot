@@ -1,0 +1,23 @@
+id: scenario_012
+ask: the license usage report takes 2 days to compile by hand across Jira and Confluence
+requester:
+  name: Golden User
+  dept: IT Ops
+  role: Service Manager
+scripted_answers:
+  urgency: this quarter
+  success_criteria: license report one click before renewals
+  data_fields: product, seats, last active
+  refresh_frequency: monthly
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    business_outcome:
+      provenance: extracted
+    affected_systems:
+      contains: Jira
+    urgency:
+      value: this quarter
+  routing_queue: data-platform
+  request_type: data_request

@@ -1,0 +1,21 @@
+id: scenario_010
+ask: our pick rate report takes 4 hours to compile by hand each shift
+requester:
+  name: Golden User
+  dept: Warehouse
+  role: Shift Supervisor
+scripted_answers:
+  urgency: this week
+  success_criteria: pick rates on screen at shift end
+  data_fields: picks per hour, errors, station
+  refresh_frequency: daily
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    business_outcome:
+      provenance: extracted
+    urgency:
+      value: this week
+  routing_queue: data-platform
+  request_type: data_request

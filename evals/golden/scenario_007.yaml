@@ -1,0 +1,23 @@
+id: scenario_007
+ask: the campaign performance export takes 2 days to pull by hand out of HubSpot
+requester:
+  name: Golden User
+  dept: Marketing
+  role: Campaign Manager
+scripted_answers:
+  urgency: this week
+  success_criteria: campaign export self-serve in one click
+  data_fields: impressions, clicks, MQLs
+  refresh_frequency: weekly
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    business_outcome:
+      provenance: extracted
+    affected_systems:
+      contains: HubSpot
+    urgency:
+      value: this week
+  routing_queue: data-platform
+  request_type: data_request

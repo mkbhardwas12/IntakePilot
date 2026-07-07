@@ -1,0 +1,22 @@
+id: scenario_017
+ask: the SAP order process applies the wrong tax code since the update
+requester:
+  name: Golden User
+  dept: Sales Ops
+  role: Account Exec
+scripted_answers:
+  urgency: this week
+  expected_behavior: correct tax code per customer country
+  success_criteria: audited orders show correct tax
+strict: true
+gold:
+  questions_asked_max: 7
+  slots:
+    current_behavior:
+      provenance: extracted
+    affected_systems:
+      contains: SAP
+    urgency:
+      value: this week
+  routing_queue: internal-tools
+  request_type: bug_report
