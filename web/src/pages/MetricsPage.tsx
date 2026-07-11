@@ -1,35 +1,52 @@
 import { useEffect, useState } from "react";
-import { getMetrics } from "../api";
-import type { MetricsResponse } from "../api";
+import { acceptGlossaryTerm, getGlossaryProposals, getMetrics } from "../api";
+import type { GlossaryProposal, MetricsResponse } from "../api";
 import { useToast } from "../toast";
 
 export function MetricsPage() {
   const toast = useToast();
   const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
   const [failed, setFailed] = useState(false);
+  const [proposals, setProposals] = useState<GlossaryProposal[]>([]);
+
+  const loadMetrics = () => {
+    setFailed(false);
+    getMetrics()
+      .then((m) => setMetrics(m))
+      .catch((err: unknown) => {
+        setFailed(true);
+        toast(`Could not load metrics: ${err instanceof Error ? err.message : String(err)}`);
+      });
+  };
+
+  const loadProposals = () => {
+    getGlossaryProposals()
+      .then((r) => setProposals(Array.isArray(r) ? r : r.proposals ?? []))
+      .catch(() => setProposals([]));
+  };
 
   useEffect(() => {
-    let cancelled = false;
-    getMetrics()
-      .then((m) => {
-        if (!cancelled) setMetrics(m);
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setFailed(true);
-          toast(`Could not load metrics: ${err instanceof Error ? err.message : String(err)}`);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [toast]);
+    loadMetrics();
+    loadProposals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const accept = async (p: GlossaryProposal) => {
+    try {
+      await acceptGlossaryTerm(p.term, p.maps_to ?? {});
+      toast(`Accepted “${p.term}”`);
+      loadProposals();
+    } catch (err: unknown) {
+      toast(`Accept failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
 
   if (failed) {
     return (
       <div className="metrics-page">
         <h1 className="page-title">Metrics</h1>
         <div className="empty-note">Metrics are unavailable right now — is the backend running?</div>
+        <button type="button" className="ghost-btn" onClick={loadMetrics}>Retry</button>
       </div>
     );
   }
@@ -111,6 +128,31 @@ export function MetricsPage() {
               </div>
             ))}
           </div>
+        )}
+      </section>
+
+      <section className="glossary-inbox">
+        <h2 className="section-title">Glossary proposals</h2>
+        <p className="page-sub">Recurring corrections mined into vocabulary — accept to teach the next intake.</p>
+        {proposals.length === 0 ? (
+          <div className="empty-note">No proposals yet — confirm a few intakes with edits.</div>
+        ) : (
+          <ul className="proposal-list">
+            {proposals.map((p) => (
+              <li key={p.term} className="proposal-row">
+                <div>
+                  <strong>{p.term}</strong>
+                  <span className="proposal-meta">
+                    {typeof p.maps_to === "object" ? JSON.stringify(p.maps_to) : String(p.maps_to ?? "")}
+                    {p.evidence_count != null ? ` · evidence ${p.evidence_count}` : ""}
+                  </span>
+                </div>
+                <button type="button" className="ghost-btn small" onClick={() => void accept(p)}>
+                  Accept
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
     </div>

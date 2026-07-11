@@ -73,6 +73,6 @@ async def seed(store, obj: RequirementObject) -> dict:
     await store.put_version(obj)
     session = {"session_id": "s-test", "req_id": obj.req_id, "turns": [],
                "pending_questions": [], "budget_spent": 0,
-               "requester": obj.requester.model_dump()}
+               "requester": obj.requester.model_dump(), "decisions": []}
     await store.put_session(session)
     return session

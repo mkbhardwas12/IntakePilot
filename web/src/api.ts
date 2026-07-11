@@ -1,11 +1,15 @@
 import type {
   ConfirmResponse,
+  DecisionEvent,
+  GateResult,
   Question,
   RequirementObject,
   Slot,
   SlotSchemaEntry,
   TurnResult
 } from "./types";
+
+export type { DecisionEvent };
 
 export interface HealthResponse { status: string; provider: string; store: string; }
 export interface SchemaResponse {
@@ -45,6 +49,7 @@ export type TurnStage = "extracting" | "resolving_gaps" | "composing_questions" 
 export interface TurnStreamHandlers {
   onStatus?: (stage: TurnStage) => void;
   onSlot?: (key: string, slot: Slot) => void;
+  onDecision?: (decision: DecisionEvent) => void;
   onReadiness?: (score: number) => void;
   onQuestions?: (questions: Question[]) => void;
 }
@@ -118,6 +123,97 @@ export function getMetrics(): Promise<MetricsResponse> {
   return fetch("/api/metrics").then((r) => toJson<MetricsResponse>(r));
 }
 
+export interface ShareCreateResponse { token: string; url: string; expires_at: string; }
+export interface SharePayload {
+  req_id: string;
+  draft: RequirementObject;
+  decisions: DecisionEvent[];
+  gates: GateResult[] | null;
+  routing: ConfirmResponse["routing"] | null;
+  ticket: ConfirmResponse["ticket"] | null;
+  collisions: ConfirmResponse["collisions"] | null;
+  acceptance: unknown[] | null;
+  title_hint: string;
+  ask_verbatim: string;
+  queue: string | null;
+  readiness_score: number;
+  status: string;
+}
+
+export function createShare(
+  reqId: string,
+  sessionId: string,
+  body: {
+    decisions?: DecisionEvent[];
+    gates?: GateResult[];
+    routing?: ConfirmResponse["routing"];
+    ticket?: ConfirmResponse["ticket"];
+    collisions?: ConfirmResponse["collisions"];
+    acceptance?: unknown[];
+  } = {}
+): Promise<ShareCreateResponse> {
+  return fetch(`/api/requirements/${reqId}/share`, {
+    method: "POST",
+    headers: { ...jsonHeaders, ...ownerHeaders(sessionId) },
+    body: JSON.stringify(body)
+  }).then((r) => toJson<ShareCreateResponse>(r));
+}
+
+export function getShare(token: string): Promise<SharePayload> {
+  return fetch(`/api/share/${encodeURIComponent(token)}`).then((r) => toJson<SharePayload>(r));
+}
+
+export function cloneFromShare(token: string): Promise<SessionCreateResponse> {
+  return fetch(`/api/share/${encodeURIComponent(token)}/clone`, {
+    method: "POST",
+    headers: jsonHeaders,
+    body: "{}"
+  }).then((r) => toJson<SessionCreateResponse>(r));
+}
+
+export function cloneFromTriage(reqId: string): Promise<SessionCreateResponse> {
+  return fetch(`/api/triage/${encodeURIComponent(reqId)}/clone`, {
+    method: "POST",
+    headers: jsonHeaders,
+    body: "{}"
+  }).then((r) => toJson<SessionCreateResponse>(r));
+}
+
+export interface TriageItem {
+  req_id: string; status: string; queue: string | null;
+  title_hint: string; readiness_score: number; ask_verbatim: string;
+}
+
+export function getTriage(limit = 50): Promise<{ items: TriageItem[] }> {
+  return fetch(`/api/triage?limit=${limit}`).then((r) => toJson<{ items: TriageItem[] }>(r));
+}
+
+export interface GlossaryProposal { term: string; maps_to: unknown; evidence_count?: number; [k: string]: unknown; }
+
+export function getGlossaryProposals(): Promise<{ proposals: GlossaryProposal[] } | GlossaryProposal[]> {
+  return fetch("/api/glossary/proposals").then((r) => toJson<{ proposals: GlossaryProposal[] } | GlossaryProposal[]>(r));
+}
+
+export function acceptGlossaryTerm(term: string, mapsTo: unknown): Promise<unknown> {
+  return fetch("/api/glossary", {
+    method: "POST",
+    headers: jsonHeaders,
+    body: JSON.stringify({ term, maps_to: mapsTo })
+  }).then((r) => toJson<unknown>(r));
+}
+
+export function rerouteRequirement(reqId: string, queue: string): Promise<unknown> {
+  return fetch(`/api/requirements/${reqId}/reroute`, {
+    method: "POST",
+    headers: jsonHeaders,
+    body: JSON.stringify({ queue })
+  }).then((r) => toJson<unknown>(r));
+}
+
+export function getGraph(): Promise<{ nodes: { id: string; label?: string }[]; edges: { source: string; target: string; shared?: string[] }[] }> {
+  return fetch("/api/graph").then((r) => toJson(r));
+}
+
 export interface AttachResponse { draft: RequirementObject; attached_to: string; }
 
 /** Duplicate-merge: close this (gated) requirement as a duplicate of target. */
@@ -133,17 +229,8 @@ export function attachRequirement(
   }).then((r) => toJson<AttachResponse>(r));
 }
 
-/** Parse one SSE frame into { event, data } (data lines concatenated). */
-function parseFrame(frame: string): { event: string; data: string } {
-  let event = "message";
-  const dataLines: string[] = [];
-  for (const rawLine of frame.split("\n")) {
-    const line = rawLine.endsWith("\r") ? rawLine.slice(0, -1) : rawLine;
-    if (line.startsWith("event:")) event = line.slice(6).trim();
-    else if (line.startsWith("data:")) dataLines.push(line.slice(5).trimStart());
-  }
-  return { event, data: dataLines.join("\n") };
-}
+import { parseFrame } from "./sseParse";
+export { parseFrame };
 
 /**
  * Send a turn and consume the SSE stream, invoking handlers per event.
@@ -156,14 +243,16 @@ function parseFrame(frame: string): { event: string; data: string } {
 export async function sendTurn(
   sessionId: string,
   body: TurnRequestBody,
-  handlers: TurnStreamHandlers = {}
+  handlers: TurnStreamHandlers = {},
+  signal?: AbortSignal
 ): Promise<TurnResult> {
   let turnReached = false; // did the server receive/process the turn?
   try {
     const res = await fetch(`/api/sessions/${sessionId}/turns`, {
       method: "POST",
       headers: jsonHeaders,
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal
     });
     if (!res.ok) throw new Error(`Turn request failed (${res.status})`);
     turnReached = true;
@@ -187,6 +276,9 @@ export async function sendTurn(
           handlers.onSlot?.(p.key, p.slot);
           break;
         }
+        case "decision":
+          handlers.onDecision?.(payload as DecisionEvent);
+          break;
         case "readiness":
           handlers.onReadiness?.((payload as { score: number }).score);
           break;
@@ -202,6 +294,10 @@ export async function sendTurn(
     };
 
     for (;;) {
+      if (signal?.aborted) {
+        await reader.cancel();
+        throw new DOMException("Aborted", "AbortError");
+      }
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
@@ -218,6 +314,7 @@ export async function sendTurn(
     if (!result) throw new Error("Stream ended without a done event");
     return result;
   } catch (err) {
+    if ((err as { name?: string })?.name === "AbortError") throw err;
     // Pre-flight failure (network error, non-2xx): the turn didn't run.
     if (!turnReached) throw err;
     // The server itself reported the turn failed: surface its message.

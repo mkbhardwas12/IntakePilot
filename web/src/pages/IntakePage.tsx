@@ -1,42 +1,56 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createSession, getSchema, sendTurn } from "../api";
+import { createSession, getSchema, getSession, sendTurn } from "../api";
 import type { TurnAnswer, TurnStage } from "../api";
-import type { ConfirmResponse, Question, RequirementObject, SlotSchemaEntry } from "../types";
+import type { ConfirmResponse, DecisionEvent, Question, RequirementObject, SlotSchemaEntry } from "../types";
 import { useToast } from "../toast";
 import { Chat } from "../components/Chat";
 import type { ChatMessage } from "../components/Chat";
 import { ShadowDraft } from "../components/ShadowDraft";
+import { DecisionRail } from "../components/DecisionRail";
 import { ConfirmView } from "../components/ConfirmView";
 import { PostConfirm } from "../components/PostConfirm";
 
 type View = "intake" | "confirm" | "done";
 
-const REQUESTER = { name: "Demo User", dept: "Finance Ops", role: "Analyst" };
+const SESSION_KEY = "intakepilot-session";
+const REQUESTER_KEY = "intakepilot-requester";
+
+const DEFAULT_REQUESTER = { name: "Demo User", dept: "Finance Ops", role: "Analyst" };
+
+const VIRAL_DEMO_ASK =
+  "our monthly vendor spend report takes 3 days to compile by hand from SAP and spreadsheets — finance needs it by month-end";
 
 export function IntakePage() {
   const toast = useToast();
 
+  const [requester, setRequester] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem(REQUESTER_KEY);
+      if (raw) return JSON.parse(raw) as typeof DEFAULT_REQUESTER;
+    } catch { /* ignore */ }
+    return DEFAULT_REQUESTER;
+  });
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [schema, setSchema] = useState<Record<string, SlotSchemaEntry> | null>(null);
   const [schemaForType, setSchemaForType] = useState<string | null>(null);
   const [draft, setDraft] = useState<RequirementObject | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [answered, setAnswered] = useState<Record<string, string>>({});
-  // Answers collected for the current question set but not yet sent: one
-  // turn carries the whole batch, so unanswered questions aren't logged
-  // "skipped" and re-asked (double-spending budget) after every single chip.
   const [pendingAnswers, setPendingAnswers] = useState<TurnAnswer[]>([]);
   const [currentQuestions, setCurrentQuestions] = useState<Question[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [stage, setStage] = useState<TurnStage | null>(null);
   const [confirmUnlocked, setConfirmUnlocked] = useState(false);
   const [changedKeys, setChangedKeys] = useState<Set<string>>(new Set());
+  const [decisions, setDecisions] = useState<DecisionEvent[]>([]);
   const [view, setView] = useState<View>("intake");
   const [confirmResult, setConfirmResult] = useState<ConfirmResponse | null>(null);
+  const [demoPlaying, setDemoPlaying] = useState(false);
 
   const nextMsgId = useRef(1);
   const pulseTimers = useRef<Map<string, number>>(new Map());
-  const initedRef = useRef(false); // StrictMode double-mount guard
+  const initedRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   const pulseSlot = useCallback((key: string) => {
     setChangedKeys((prev) => {
@@ -71,8 +85,15 @@ export function IntakePage() {
       });
   }, [toast]);
 
-  const initSession = useCallback(() => {
-    setSessionId(null);
+  const persistSession = useCallback((sid: string) => {
+    try { sessionStorage.setItem(SESSION_KEY, sid); } catch { /* ignore */ }
+  }, []);
+
+  const clearPersisted = useCallback(() => {
+    try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
+  }, []);
+
+  const resetLocalState = useCallback(() => {
     setDraft(null);
     setSchemaForType(null);
     setMessages([]);
@@ -83,38 +104,84 @@ export function IntakePage() {
     setStage(null);
     setConfirmUnlocked(false);
     setChangedKeys(new Set());
+    setDecisions([]);
     setView("intake");
     setConfirmResult(null);
-    createSession(REQUESTER)
+    setDemoPlaying(false);
+  }, []);
+
+  const initSession = useCallback((overrideRequester?: typeof DEFAULT_REQUESTER) => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    clearPersisted();
+    setSessionId(null);
+    resetLocalState();
+    const who = overrideRequester ?? requester;
+    createSession(who)
       .then((s) => {
         setSessionId(s.session_id);
         setDraft(s.draft);
+        persistSession(s.session_id);
       })
       .catch((err: unknown) => {
         toast(`Could not start a session: ${err instanceof Error ? err.message : String(err)}`);
       });
     loadSchema("default");
-  }, [loadSchema, toast]);
+  }, [requester, loadSchema, toast, clearPersisted, persistSession, resetLocalState]);
 
   useEffect(() => {
-    // React 18 StrictMode double-invokes mount effects in dev; without the
-    // guard every page load persisted an orphan backend session + requirement.
-    if (!initedRef.current) {
-      initedRef.current = true;
-      initSession();
-    }
+    if (initedRef.current) return;
+    initedRef.current = true;
     const timers = pulseTimers.current;
+
+    const restore = async () => {
+      let saved: string | null = null;
+      try { saved = sessionStorage.getItem(SESSION_KEY); } catch { /* ignore */ }
+      if (saved) {
+        try {
+          const s = await getSession(saved);
+          setSessionId(s.session_id);
+          setDraft(s.draft);
+          setCurrentQuestions(s.pending_questions);
+          setConfirmUnlocked(
+            ["awaiting_confirmation", "confirmed", "gated", "routed"].includes(s.draft.status)
+          );
+          if (s.turns?.length) {
+            setMessages(
+              s.turns.map((t) => ({
+                id: nextMsgId.current++,
+                role: t.role,
+                text: t.text,
+                questions: t.role === "assistant" ? s.pending_questions : undefined,
+              }))
+            );
+          }
+          loadSchema(s.draft.request_type || "default");
+          return;
+        } catch {
+          clearPersisted();
+        }
+      }
+      initSession();
+    };
+    void restore();
+
     return () => {
       timers.forEach((t) => window.clearTimeout(t));
       timers.clear();
+      abortRef.current?.abort();
     };
-  }, [initSession]);
+  }, [initSession, loadSchema, clearPersisted]);
 
   useEffect(() => {
     if (!draft) return;
     const desired = draft.request_type || "default";
     if (desired !== schemaForType) loadSchema(desired);
   }, [draft?.request_type, schemaForType, loadSchema]);
+
+  useEffect(() => {
+    try { sessionStorage.setItem(REQUESTER_KEY, JSON.stringify(requester)); } catch { /* ignore */ }
+  }, [requester]);
 
   const pushMessage = useCallback((msg: Omit<ChatMessage, "id">) => {
     setMessages((prev) => [...prev, { ...msg, id: nextMsgId.current++ }]);
@@ -123,14 +190,13 @@ export function IntakePage() {
   const sendMessage = useCallback(
     async (text: string, answers?: TurnAnswer[]) => {
       if (!sessionId || streaming) return;
-      // Free-text sends carry any answers collected so far, so a partial
-      // question set is never silently dropped (and never logged skipped
-      // prematurely by an eager per-chip turn).
       const batch = answers ?? (pendingAnswers.length > 0 ? pendingAnswers : undefined);
       setPendingAnswers([]);
       pushMessage({ role: "user", text });
       setStreaming(true);
       setStage("extracting");
+      const ac = new AbortController();
+      abortRef.current = ac;
       try {
         const result = await sendTurn(
           sessionId,
@@ -141,12 +207,13 @@ export function IntakePage() {
               setDraft((d) => (d ? { ...d, slots: { ...d.slots, [key]: slot } } : d));
               pulseSlot(key);
             },
+            onDecision: (d) => setDecisions((prev) => [...prev, d]),
             onReadiness: (score) => {
               setDraft((d) => (d ? { ...d, readiness_score: score } : d));
             }
-          }
+          },
+          ac.signal
         );
-        // Reconcile with the authoritative final state.
         setDraft((prev) => {
           if (prev) {
             for (const key of Object.keys(result.draft.slots)) {
@@ -172,10 +239,14 @@ export function IntakePage() {
           degraded: result.degraded
         });
       } catch (err: unknown) {
-        toast(`Turn failed: ${err instanceof Error ? err.message : String(err)}`);
+        if ((err as { name?: string })?.name === "AbortError") return;
+        const detail = err instanceof Error ? err.message : String(err);
+        pushMessage({ role: "assistant", text: `Turn failed: ${detail}`, error: true });
+        toast(`Turn failed: ${detail}`);
       } finally {
         setStreaming(false);
         setStage(null);
+        abortRef.current = null;
       }
     },
     [sessionId, streaming, pendingAnswers, pushMessage, pulseSlot, toast]
@@ -188,7 +259,6 @@ export function IntakePage() {
         ...pendingAnswers.filter((a) => a.question_id !== question.id),
         { question_id: question.id, slot_key: question.slot_key, value }
       ];
-      // Whole set answered → send one batched turn; otherwise keep collecting.
       if (currentQuestions.length > 0 && next.length >= currentQuestions.length) {
         void sendMessage(next.map((a) => String(a.value)).join(" · "), next);
       } else {
@@ -203,13 +273,12 @@ export function IntakePage() {
     void sendMessage(pendingAnswers.map((a) => String(a.value)).join(" · "), pendingAnswers);
   }, [pendingAnswers, sendMessage]);
 
-  /** Mid-session revision from the Shadow Draft: a silent turn — no chat
-   * bubbles, pending questions untouched — that rewrites one slot with
-   * EDITED provenance. */
   const reviseSlot = useCallback(
     async (key: string, value: string) => {
       if (!sessionId || streaming) return;
       setStreaming(true);
+      const ac = new AbortController();
+      abortRef.current = ac;
       try {
         const result = await sendTurn(
           sessionId,
@@ -219,19 +288,23 @@ export function IntakePage() {
               setDraft((d) => (d ? { ...d, slots: { ...d.slots, [k]: slot } } : d));
               pulseSlot(k);
             },
+            onDecision: (d) => setDecisions((prev) => [...prev, d]),
             onReadiness: (score) => {
               setDraft((d) => (d ? { ...d, readiness_score: score } : d));
             }
-          }
+          },
+          ac.signal
         );
         setDraft(result.draft);
         setConfirmUnlocked(result.confirm_unlocked);
         const label = schema?.[key]?.label ?? key.replace(/_/g, " ");
         toast(`${label} updated.`);
       } catch (err: unknown) {
+        if ((err as { name?: string })?.name === "AbortError") return;
         toast(`Update failed: ${err instanceof Error ? err.message : String(err)}`);
       } finally {
         setStreaming(false);
+        abortRef.current = null;
       }
     },
     [sessionId, streaming, schema, pulseSlot, toast]
@@ -243,9 +316,53 @@ export function IntakePage() {
     setView("done");
   }, []);
 
+  const playDemo = useCallback(async () => {
+    if (!sessionId || streaming || demoPlaying) return;
+    setDemoPlaying(true);
+    setDecisions([]);
+    await sendMessage(VIRAL_DEMO_ASK);
+  }, [sessionId, streaming, demoPlaying, sendMessage]);
+
+  useEffect(() => {
+    if (!demoPlaying || streaming) return;
+    if (currentQuestions.length > 0 && pendingAnswers.length < currentQuestions.length) {
+      const unanswered = currentQuestions.filter(
+        (q) => !answered[q.id] && !pendingAnswers.find((a) => a.question_id === q.id)
+      );
+      if (unanswered.length === 0) return;
+      const q = unanswered[0];
+      const value = q.options?.[0] ?? "this quarter";
+      const t = window.setTimeout(() => answerQuestion(q, value), 700);
+      return () => window.clearTimeout(t);
+    }
+    if (demoPlaying && confirmUnlocked && view === "intake" && currentQuestions.length === 0) {
+      const t = window.setTimeout(() => setView("confirm"), 900);
+      return () => window.clearTimeout(t);
+    }
+  }, [demoPlaying, streaming, currentQuestions, pendingAnswers, answered, confirmUnlocked, view, answerQuestion]);
+
   if (view === "done" && confirmResult && sessionId) {
-    return <PostConfirm result={confirmResult} sessionId={sessionId} onRestart={initSession} />;
+    return (
+      <PostConfirm
+        result={confirmResult}
+        sessionId={sessionId}
+        decisions={decisions}
+        onRestart={() => initSession()}
+      />
+    );
   }
+
+  const schemaLabels: Record<string, string> = {};
+  if (schema) {
+    for (const [k, v] of Object.entries(schema)) schemaLabels[k] = v.label;
+  }
+
+  const confirmDisabledReason =
+    !draft
+      ? "Starting session…"
+      : !confirmUnlocked
+        ? `Readiness ${draft.readiness_score} — keep answering or wait for the draft to unlock`
+        : null;
 
   return (
     <div className="intake-layout">
@@ -255,28 +372,43 @@ export function IntakePage() {
         stage={stage}
         budget={draft?.question_budget ?? null}
         answered={answered}
-        disabled={!sessionId}
+        disabled={!sessionId || demoPlaying}
         pendingCount={pendingAnswers.length}
         onSend={(text) => void sendMessage(text)}
         onAnswer={answerQuestion}
         onSendAnswers={sendPendingAnswers}
+        onPlayDemo={() => void playDemo()}
+        demoPlaying={demoPlaying}
+        requester={requester}
+        onRequesterChange={setRequester}
       />
-      <ShadowDraft
-        draft={draft}
-        schema={schema}
-        changedKeys={changedKeys}
-        confirmUnlocked={confirmUnlocked}
-        editable={!!draft && !streaming && ["draft", "questioning", "awaiting_confirmation"].includes(draft.status)}
-        onRevise={(key, value) => void reviseSlot(key, value)}
-        onConfirm={() => setView("confirm")}
-      />
+      <div className="draft-column">
+        <ShadowDraft
+          draft={draft}
+          schema={schema}
+          changedKeys={changedKeys}
+          confirmUnlocked={confirmUnlocked}
+          confirmDisabledReason={confirmDisabledReason}
+          editable={!!draft && !streaming && ["draft", "questioning", "awaiting_confirmation"].includes(draft.status)}
+          onRevise={(key, value) => void reviseSlot(key, value)}
+          onConfirm={() => setView("confirm")}
+        />
+        <DecisionRail decisions={decisions} schemaLabels={schemaLabels} />
+      </div>
       {view === "confirm" && draft && sessionId && (
         <ConfirmView
           draft={draft}
           sessionId={sessionId}
           schema={schema}
-          onCancel={() => setView("intake")}
-          onConfirmed={handleConfirmed}
+          demoAutoConfirm={demoPlaying}
+          onCancel={() => {
+            setDemoPlaying(false);
+            setView("intake");
+          }}
+          onConfirmed={(resp) => {
+            setDemoPlaying(false);
+            handleConfirmed(resp);
+          }}
         />
       )}
     </div>

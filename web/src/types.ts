@@ -22,6 +22,15 @@ export interface BackendEntity {
   verified: boolean; customizations: BackendCustomization[];
 }
 export interface BackendContext { systems: string[]; entities: BackendEntity[]; discovered_at?: string; }
+export type DecisionAction =
+  | "extracted" | "inferred" | "retrieved" | "asked"
+  | "skipped" | "assumed" | "answered" | "edited";
+export interface DecisionEvent {
+  slot: string;
+  action: DecisionAction;
+  reason: string;
+  source: string | null;
+}
 export interface TurnResult { draft: RequirementObject; questions: Question[]; confirm_unlocked: boolean; degraded: boolean; }
 export interface SlotSchemaEntry { required: boolean; askable: boolean; ask_hint?: string; default?: unknown; default_reason?: string; label: string; }
 export interface GateResult {

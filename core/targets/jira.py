@@ -18,6 +18,7 @@ import re
 import httpx
 
 from core.models import RequirementObject, Ticket
+from core.providers.http_retry import request_with_retries
 
 _CODE_FENCE = re.compile(r"^```")
 
@@ -105,8 +106,9 @@ class JiraTarget:
         }}
         async with httpx.AsyncClient(timeout=30, auth=(self.email, self.token),
                                      transport=self._transport) as client:
-            resp = await client.post(f"{self.base_url}/rest/api/3/issue",
-                                     json=payload)
+            resp = await request_with_retries(
+                client, "POST", f"{self.base_url}/rest/api/3/issue",
+                json=payload)
             resp.raise_for_status()
             data = resp.json()
         key = data["key"]

@@ -6,6 +6,7 @@ Persisted as a JSON file so the demo survives restarts.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import math
 import os
@@ -43,24 +44,31 @@ class LocalVectorIndex:
 
     async def upsert(self, id: str, text: str, meta: dict) -> None:
         vec = (await self._embedder.embed([text]))[0]
-        with self._lock:
-            self._items[id] = {"text": text, "meta": meta, "vec": vec}
-            self._persist()
+
+        def _():
+            with self._lock:
+                self._items[id] = {"text": text, "meta": meta, "vec": vec}
+                self._persist()
+        await asyncio.to_thread(_)
 
     async def search(self, text: str, k: int = 5,
                      filter: dict | None = None) -> list[Hit]:
         if not self._items:
             return []
         query = (await self._embedder.embed([text]))[0]
-        qnorm = math.sqrt(sum(v * v for v in query)) or 1.0
-        hits: list[Hit] = []
-        for id_, item in self._items.items():
-            if filter and any(item["meta"].get(fk) != fv for fk, fv in filter.items()):
-                continue
-            vec = item["vec"]
-            dot = sum(a * b for a, b in zip(query, vec))
-            vnorm = math.sqrt(sum(v * v for v in vec)) or 1.0
-            hits.append(Hit(id=id_, score=dot / (qnorm * vnorm),
-                            text=item["text"], meta=item["meta"]))
-        hits.sort(key=lambda h: h.score, reverse=True)
-        return hits[:k]
+
+        def _():
+            qnorm = math.sqrt(sum(v * v for v in query)) or 1.0
+            hits: list[Hit] = []
+            for id_, item in self._items.items():
+                if filter and any(item["meta"].get(fk) != fv
+                                  for fk, fv in filter.items()):
+                    continue
+                vec = item["vec"]
+                dot = sum(a * b for a, b in zip(query, vec))
+                vnorm = math.sqrt(sum(v * v for v in vec)) or 1.0
+                hits.append(Hit(id=id_, score=dot / (qnorm * vnorm),
+                                text=item["text"], meta=item["meta"]))
+            hits.sort(key=lambda h: h.score, reverse=True)
+            return hits[:k]
+        return await asyncio.to_thread(_)

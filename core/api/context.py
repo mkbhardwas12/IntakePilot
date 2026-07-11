@@ -100,6 +100,7 @@ class AppContext:
             "pending_questions": [],
             "budget_spent": 0,
             "requester": requester.model_dump(),
+            "decisions": [],
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
         await self.store.put_session(session)

@@ -109,15 +109,20 @@ async def enrich(obj: RequirementObject, store, vector, connectors,
 
     # A requirement that reached confirmation with affected_systems still open
     # (or thinner than the discovery) gets it filled here — never asked.
+    # Never overwrite human ANSWERED/EDITED values (same merge invariant).
     current = obj.slots.get("affected_systems")
-    known = list(current.value) if current and isinstance(current.value, list) else []
-    merged = sorted(set(known) | set(systems))
-    if merged != sorted(known):
-        obj.slots["affected_systems"] = Slot(
-            value=merged, provenance=current.provenance if known else Provenance.RETRIEVED,
-            confidence=max(current.confidence if current else 0.0, 0.8),
-            source=((current.source + ", ") if known and current and current.source else "")
-                   + "connector:" + ",".join(sources))
+    if not (current and current.provenance in (Provenance.EDITED,
+                                               Provenance.ANSWERED)):
+        known = list(current.value) if current and isinstance(current.value, list) else []
+        merged = sorted(set(known) | set(systems))
+        if merged != sorted(known):
+            obj.slots["affected_systems"] = Slot(
+                value=merged,
+                provenance=current.provenance if known else Provenance.RETRIEVED,
+                confidence=max(current.confidence if current else 0.0, 0.8),
+                source=((current.source + ", ")
+                        if known and current and current.source else "")
+                       + "connector:" + ",".join(sources))
 
     obj.touch("enriched",
               f"{len(entities)} entities, {n_custom} customization(s) "

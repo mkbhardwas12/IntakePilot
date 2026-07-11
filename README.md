@@ -18,13 +18,16 @@ for an honest review of the spec and the choices made where it was silent.
 
 ## Quick look
 
-One intake, end to end — real UI, offline mock model, 23 seconds:
+One intake, end to end — real UI, offline mock model, ~23 seconds.
+**New: X-ray Intake** — watch the gap ladder decide *infer / retrieve / ask*
+live, then share a cinematic replay (`/r/{token}`) with an OG card.
 
 ![IntakePilot demo: plain-language ask to routed ticket](docs/assets/demo.gif)
 
-*A plain-language ask becomes a live Shadow Draft with provenance badges;
-two batched questions; confirm; five gates; routed to `data-platform` with
-a written explanation and a ticket. Higher-quality video:
+*A plain-language ask becomes a live Shadow Draft with provenance badges and
+an X-ray Decision Rail; two batched questions; confirm; five gates; routed
+ticket. Hit **Play the 23-second demo**, then **Share this intake**.
+Launch notes: [docs/LAUNCH.md](docs/LAUNCH.md). Higher-quality video:
 [docs/assets/demo.mp4](docs/assets/demo.mp4).*
 
 ## Contents
@@ -341,9 +344,15 @@ Implemented and verified (spec milestones 1–5 core, plus gates/routing from 6)
   retrieval ladder, System-context section on routed tickets and in the
   confirm/post-confirm UI
 - Web UI: chat with streaming + question chips + budget meter, live Shadow
-  Draft with provenance badges and confidence bars, readiness ring, confirm
-  view with inline edits and assumption register, gate/routing/ticket results,
-  metrics dashboard — all themed dark/light via semantic tokens
+  Draft with provenance badges and confidence bars, **X-ray Decision Rail**
+  (live gap-ladder `decision` SSE events), one-click 23s demo, readiness ring,
+  confirm view with inline edits and assumption register, gate/routing/ticket
+  results with collision constellation + **Share this intake** (`/r/{token}`
+  cinematic replay + OG card), triage queue, metrics dashboard with glossary
+  proposal inbox — all themed dark/light via semantic tokens
+- Public demo compose (`deploy/docker-compose.demo.yml`), rate limits, share
+  abuse caps, structured request logs; seed cold-start shares via
+  `python -m scripts.seed_shares`
 - Tests for the Section 11 invariants plus the ADDENDUM-01 invariants and
   acceptance scenario (`tests/`)
 
@@ -351,17 +360,19 @@ Spec'd for later (honest gaps):
 
 - Milestone 6 remainder: triage queue UI (GitHub + Jira targets, label-reroute
   webhooks and the Jira issue-done -> delivered outcome sync are shipped;
-  full bidirectional status sync is not)
+  full bidirectional status sync is not). **Triage UI ships** at `/triage`.
 - Milestone 7 remainder: nightly distillation jobs, `prompt_configs`
   promotion gate (the 40-scenario golden harness ships: `python -m
   evals.harness` scores any provider; invariants gate every test run)
-- Milestone 8: precedent backfill from targets, clone-and-modify UX, glossary
-  importer CLI (a seed glossary ships for the demo)
+- Milestone 8: precedent backfill from targets, glossary importer CLI
+  (a seed glossary ships for the demo; **clone-and-modify** ships from
+  share replay + triage)
 - Milestones 9–10: Bedrock/DynamoDB/Bedrock-KB providers, SAM template,
   Builder Agent
 - Auth/multi-tenancy (session binding + admin token + webhook signature are
   shipped; end-user SSO is your reverse proxy's job for now), schema
-  migrations — see `docs/SPEC-REVIEW.md`
+  migrations — see `docs/SPEC-REVIEW.md`. Public demo posture:
+  `docs/LAUNCH.md` + `deploy/docker-compose.demo.yml`.
 
 ## Repo layout
 

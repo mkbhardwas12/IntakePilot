@@ -17,19 +17,25 @@ interface ShadowDraftProps {
   schema: Record<string, SlotSchemaEntry> | null;
   changedKeys: Set<string>;
   confirmUnlocked: boolean;
+  confirmDisabledReason?: string | null;
   /** Pre-confirm: filled slots can be revised in place. */
   editable?: boolean;
   onRevise?: (key: string, value: string) => void;
   onConfirm: () => void;
 }
 
-export function ShadowDraft({ draft, schema, changedKeys, confirmUnlocked, editable, onRevise, onConfirm }: ShadowDraftProps) {
+export function ShadowDraft({
+  draft, schema, changedKeys, confirmUnlocked, confirmDisabledReason,
+  editable, onRevise, onConfirm
+}: ShadowDraftProps) {
   // Union: request-type schema forks (E) can add slots beyond the default
   // schema the page loaded — anything present in the draft must render.
   const slotKeys = Array.from(new Set([
     ...(schema ? Object.keys(schema) : []),
     ...(draft ? Object.keys(draft.slots) : [])
   ]));
+
+  const confirmDisabled = !draft || !confirmUnlocked;
 
   return (
     <aside className="draft-pane">
@@ -50,9 +56,18 @@ export function ShadowDraft({ draft, schema, changedKeys, confirmUnlocked, edita
         </div>
         <div className="readiness-block">
           <ReadinessRing score={draft?.readiness_score ?? 0} />
-          <button className="confirm-btn" disabled={!draft || !confirmUnlocked} onClick={onConfirm}>
+          <button
+            className="confirm-btn"
+            disabled={confirmDisabled}
+            onClick={onConfirm}
+            title={confirmDisabledReason ?? undefined}
+            aria-description={confirmDisabledReason ?? undefined}
+          >
             Confirm <span aria-hidden="true">→</span>
           </button>
+          {confirmDisabled && confirmDisabledReason && (
+            <span className="confirm-hint">{confirmDisabledReason}</span>
+          )}
         </div>
       </div>
 

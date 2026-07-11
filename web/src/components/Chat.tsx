@@ -9,6 +9,7 @@ export interface ChatMessage {
   text: string;
   questions?: Question[];
   degraded?: boolean;
+  error?: boolean;
 }
 
 const STAGE_LABELS: Record<TurnStage, string> = {
@@ -24,6 +25,12 @@ const EXAMPLE_PROMPTS = [
   "onboarding a new supplier means re-typing the same data into 4 systems"
 ];
 
+interface RequesterInfo {
+  name: string;
+  dept: string;
+  role: string;
+}
+
 interface ChatProps {
   messages: ChatMessage[];
   streaming: boolean;
@@ -31,16 +38,24 @@ interface ChatProps {
   budget: Budget | null;
   answered: Record<string, string>;
   disabled: boolean;
-  /** Answers collected but not yet sent (partial question set). */
   pendingCount: number;
   onSend: (text: string) => void;
   onAnswer: (question: Question, value: string) => void;
   onSendAnswers: () => void;
+  onPlayDemo?: () => void;
+  demoPlaying?: boolean;
+  requester?: RequesterInfo;
+  onRequesterChange?: (r: RequesterInfo) => void;
 }
 
-export function Chat({ messages, streaming, stage, budget, answered, disabled, pendingCount, onSend, onAnswer, onSendAnswers }: ChatProps) {
+export function Chat({
+  messages, streaming, stage, budget, answered, disabled, pendingCount,
+  onSend, onAnswer, onSendAnswers, onPlayDemo, demoPlaying,
+  requester, onRequesterChange
+}: ChatProps) {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const liveRef = useRef<HTMLDivElement>(null);
   const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
 
   useEffect(() => {
@@ -58,19 +73,63 @@ export function Chat({ messages, streaming, stage, budget, answered, disabled, p
 
   return (
     <section className="chat-pane">
+      {requester && onRequesterChange && messages.length === 0 && (
+        <div className="requester-bar">
+          <label>
+            Name
+            <input
+              value={requester.name}
+              onChange={(e) => onRequesterChange({ ...requester, name: e.target.value })}
+              disabled={disabled || demoPlaying}
+            />
+          </label>
+          <label>
+            Dept
+            <input
+              value={requester.dept}
+              onChange={(e) => onRequesterChange({ ...requester, dept: e.target.value })}
+              disabled={disabled || demoPlaying}
+            />
+          </label>
+          <label>
+            Role
+            <input
+              value={requester.role}
+              onChange={(e) => onRequesterChange({ ...requester, role: e.target.value })}
+              disabled={disabled || demoPlaying}
+            />
+          </label>
+        </div>
+      )}
       <div className="chat-scroll" ref={scrollRef}>
+        <div className="sr-only" aria-live="polite" aria-atomic="true" ref={liveRef}>
+          {streaming && stage ? STAGE_LABELS[stage] : ""}
+          {!streaming && messages.length > 0 ? messages[messages.length - 1]?.text : ""}
+        </div>
         {messages.length === 0 && !streaming ? (
           <div className="chat-hero">
             <div className="chat-hero-glow" aria-hidden="true" />
             <h1>
               Describe what you need.
               <br />
-              <span className="hero-accent">IntakePilot drafts the requirement.</span>
+              <span className="hero-accent">Watch the X-ray draft it.</span>
             </h1>
-            <p className="hero-sub">Type in plain language — the agent extracts structure as you go.</p>
+            <p className="hero-sub">
+              Plain language in — structured requirement out. The orchestrator shows every infer, retrieve, and ask.
+            </p>
+            {onPlayDemo && (
+              <button
+                type="button"
+                className="play-demo-btn"
+                onClick={onPlayDemo}
+                disabled={disabled || demoPlaying}
+              >
+                {demoPlaying ? "Playing demo…" : "Play the 23-second demo"}
+              </button>
+            )}
             <div className="hero-examples">
               {EXAMPLE_PROMPTS.map((p) => (
-                <button key={p} className="example-chip" onClick={() => onSend(p)} disabled={disabled}>
+                <button key={p} className="example-chip" onClick={() => onSend(p)} disabled={disabled || demoPlaying}>
                   {p}
                 </button>
               ))}
@@ -90,7 +149,7 @@ export function Chat({ messages, streaming, stage, budget, answered, disabled, p
                   </div>
                   <div className="assistant-body">
                     {m.degraded && <span className="degraded-tag">degraded mode</span>}
-                    <div className="bubble assistant-bubble">{m.text}</div>
+                    <div className={`bubble assistant-bubble${m.error ? " error-bubble" : ""}`}>{m.text}</div>
                     {m.questions && m.questions.length > 0 && (
                       <div className="question-cards">
                         {m.questions.map((q) => (
@@ -98,8 +157,7 @@ export function Chat({ messages, streaming, stage, budget, answered, disabled, p
                             key={q.id}
                             question={q}
                             selected={answered[q.id]}
-                            // Only questions on the latest assistant turn stay interactive.
-                            interactive={m.id === lastAssistantId && !streaming}
+                            interactive={m.id === lastAssistantId && !streaming && !demoPlaying}
                             onAnswer={onAnswer}
                           />
                         ))}
@@ -160,11 +218,15 @@ export function Chat({ messages, streaming, stage, budget, answered, disabled, p
 function BudgetDots({ budget }: { budget: Budget }) {
   const dots = Array.from({ length: budget.max }, (_, i) => i < budget.spent);
   return (
-    <div className="budget-row" title={`${budget.spent} of ${budget.max} questions used`}>
+    <div
+      className="budget-row"
+      title={`${budget.spent} of ${budget.max} questions used`}
+      aria-label={`${budget.spent} of ${budget.max} questions used`}
+    >
       <span className="budget-label">
         {budget.spent} of {budget.max} questions used
       </span>
-      <span className="budget-dots">
+      <span className="budget-dots" aria-hidden="true">
         {dots.map((filled, i) => (
           <span key={i} className={filled ? "budget-dot filled" : "budget-dot"} />
         ))}
@@ -189,10 +251,10 @@ function QuestionCard({
 
   return (
     <div className={answeredAlready ? "question-card answered" : "question-card"}>
-      <div className="question-text">{question.text}</div>
+      <div className="question-text" id={`q-${question.id}`}>{question.text}</div>
       <div className="question-because">Why we ask: {question.because}</div>
       {question.options && question.options.length > 0 ? (
-        <div className="option-chips">
+        <div className="option-chips" role="group" aria-labelledby={`q-${question.id}`}>
           {question.options.map((opt) => (
             <button
               key={opt}

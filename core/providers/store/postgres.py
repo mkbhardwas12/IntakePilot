@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS requirements (
 CREATE TABLE IF NOT EXISTS sessions (
   session_id TEXT PRIMARY KEY, req_id TEXT,
   turns JSONB, pending_questions JSONB, budget_spent INT DEFAULT 0,
-  requester JSONB, created_at TIMESTAMPTZ, updated_at TIMESTAMPTZ);
+  requester JSONB, decisions JSONB, created_at TIMESTAMPTZ, updated_at TIMESTAMPTZ);
 
 CREATE TABLE IF NOT EXISTS edit_diffs (
   id BIGSERIAL PRIMARY KEY,
@@ -54,7 +54,17 @@ CREATE TABLE IF NOT EXISTS system_kb (
   last_refreshed TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (system, entity));
 
+CREATE TABLE IF NOT EXISTS shares (
+  id BIGSERIAL PRIMARY KEY,
+  token TEXT UNIQUE,
+  req_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  expires_at TIMESTAMPTZ,
+  payload JSONB);
+
 CREATE TABLE IF NOT EXISTS seq (year INT PRIMARY KEY, n INT);
+
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS decisions JSONB;
 """
 
 LEDGER_COLS = {
@@ -66,12 +76,13 @@ LEDGER_COLS = {
     "glossary": ["term", "maps_to", "evidence_count", "last_confirmed"],
     "system_kb": ["system", "entity", "label", "schema", "evidence_count",
                   "verified", "last_refreshed"],
+    "shares": ["token", "req_id", "created_at", "expires_at", "payload"],
 }
 _JSON_COLS = {"proposed", "corrected", "ask_embedding", "detail", "maps_to",
-              "schema"}
+              "schema", "payload"}
 # Callers pass ISO strings / 0-1 ints (SQLite-friendly); asyncpg needs
 # real datetime / bool for TIMESTAMPTZ / BOOL columns.
-_TS_COLS = {"last_confirmed", "last_refreshed"}
+_TS_COLS = {"last_confirmed", "last_refreshed", "created_at", "expires_at"}
 _BOOL_COLS = {"changed_routing", "verified"}
 
 
@@ -178,16 +189,18 @@ class PostgresStore:
         now = datetime.now(timezone.utc)
         await pool.execute(
             """INSERT INTO sessions (session_id, req_id, turns, pending_questions,
-                 budget_spent, requester, created_at, updated_at)
-               VALUES ($1,$2,$3::jsonb,$4::jsonb,$5,$6::jsonb,$7,$8)
+                 budget_spent, requester, decisions, created_at, updated_at)
+               VALUES ($1,$2,$3::jsonb,$4::jsonb,$5,$6::jsonb,$7::jsonb,$8,$9)
                ON CONFLICT (session_id) DO UPDATE SET
                  turns=EXCLUDED.turns, pending_questions=EXCLUDED.pending_questions,
-                 budget_spent=EXCLUDED.budget_spent, updated_at=EXCLUDED.updated_at""",
+                 budget_spent=EXCLUDED.budget_spent, decisions=EXCLUDED.decisions,
+                 updated_at=EXCLUDED.updated_at""",
             session["session_id"], session["req_id"],
             json.dumps(session.get("turns", [])),
             json.dumps(session.get("pending_questions", [])),
             session.get("budget_spent", 0),
             json.dumps(session.get("requester", {})),
+            json.dumps(session.get("decisions", [])),
             datetime.fromisoformat(session["created_at"]) if session.get("created_at") else now,
             now)
 
@@ -203,9 +216,11 @@ class PostgresStore:
     @staticmethod
     def _session_dict(row) -> dict:
         d = dict(row)
-        for c in ("turns", "pending_questions", "requester"):
+        for c in ("turns", "pending_questions", "requester", "decisions"):
             if isinstance(d.get(c), str):
                 d[c] = json.loads(d[c])
+            elif d.get(c) is None:
+                d[c] = {} if c == "requester" else []
         for c in ("created_at", "updated_at"):
             if d.get(c) is not None and not isinstance(d[c], str):
                 d[c] = d[c].isoformat()

@@ -91,3 +91,17 @@ Everything is selectable in `intakepilot.yaml` and overridable by environment:
 ## Security checklist before exposing beyond localhost
 
 IntakePilot has **no built-in end-user authentication yet** (see PROJECT-REVIEW.md). Front the web port with your SSO/reverse proxy (oauth2-proxy, Authelia, an ALB/App Gateway with OIDC) or keep it on an internal network; terminate TLS at that proxy. Three switches you should set in `.env`: **`INTAKEPILOT_ADMIN_TOKEN`** — one bearer token that closes every admin/ops surface (metrics, system-KB, glossary, evals replay, reroute); **`INTAKEPILOT_WEBHOOK_SECRET`** — enables `X-Hub-Signature-256` verification on the GitHub webhook (same secret in the GitHub webhook settings); and `POSTGRES_PASSWORD`, which is deliberately not baked into any image. Requirements themselves are session-bound (`X-Session-Id`). Keep Postgres unexposed (the prod compose already does) and back up the `pgdata` volume.
+
+## 6. Public demo host
+
+For a shareable viral demo (mock LLM, SQLite, rate limits, required secrets):
+
+```bash
+cp deploy/.env.demo.example deploy/.env.demo
+# set INTAKEPILOT_ADMIN_TOKEN, INTAKEPILOT_WEBHOOK_SECRET, DEMO_ORIGIN
+docker compose -f deploy/docker-compose.demo.yml --env-file deploy/.env.demo up --build
+INTAKEPILOT_BASE_URL=https://your-demo-host python -m scripts.seed_shares
+```
+
+See `docs/LAUNCH.md` for the HN/Launch angle and the 30-second demo script.
+CORS origins: set `INTAKEPILOT_CORS_ORIGINS` (comma-separated) or `DEMO_ORIGIN` via the demo compose env.

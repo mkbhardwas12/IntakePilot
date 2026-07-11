@@ -8,6 +8,7 @@ import os
 import httpx
 
 from core.models import RequirementObject, Ticket
+from core.providers.http_retry import request_with_retries
 
 
 class GitHubTarget:
@@ -23,7 +24,8 @@ class GitHubTarget:
         if not (self.repo and self.token):
             raise RuntimeError("GitHub target requires repo config and GITHUB_TOKEN")
         async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.post(
+            resp = await request_with_retries(
+                client, "POST",
                 f"https://api.github.com/repos/{self.repo}/issues",
                 headers={"Authorization": f"Bearer {self.token}",
                          "Accept": "application/vnd.github+json"},

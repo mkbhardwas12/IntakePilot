@@ -1,14 +1,23 @@
 """FastAPI application factory."""
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.api.context import AppContext
+from core.api.middleware import RateLimitMiddleware, RequestLogMiddleware
 from core.api import (channels, evals, glossary, graph, kb, metrics,
-                      requirements, sessions, webhooks)
+                      requirements, sessions, share, triage, webhooks)
+
+
+def _cors_origins() -> list[str]:
+    raw = os.environ.get("INTAKEPILOT_CORS_ORIGINS", "").strip()
+    if raw:
+        return [o.strip() for o in raw.split(",") if o.strip()]
+    return ["http://localhost:3000", "http://127.0.0.1:3000"]
 
 
 def create_app(ctx: AppContext | None = None) -> FastAPI:
@@ -19,10 +28,13 @@ def create_app(ctx: AppContext | None = None) -> FastAPI:
 
     app = FastAPI(title="IntakePilot", version="0.1.0", lifespan=lifespan)
     app.state.ctx = ctx or AppContext()
+    # Last-added middleware runs first on the request path.
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+        allow_origins=_cors_origins(),
         allow_methods=["*"], allow_headers=["*"])
+    app.add_middleware(RateLimitMiddleware)
+    app.add_middleware(RequestLogMiddleware)
 
     @app.get("/health")
     async def health(request: Request):
@@ -49,6 +61,8 @@ def create_app(ctx: AppContext | None = None) -> FastAPI:
 
     app.include_router(sessions.router)
     app.include_router(requirements.router)
+    app.include_router(share.router)
+    app.include_router(triage.router)
     app.include_router(metrics.router)
     app.include_router(kb.router)
     app.include_router(evals.router)

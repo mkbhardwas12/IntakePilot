@@ -5,6 +5,7 @@ put_version can only INSERT, never UPDATE.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import sqlite3
 import threading
@@ -25,10 +26,11 @@ LEDGER_TABLES = {
     # Keyed upsert on (system, entity); embedding lives in the vector index.
     "system_kb": ["system", "entity", "label", "schema", "evidence_count",
                   "verified", "last_refreshed"],
+    "shares": ["token", "req_id", "created_at", "expires_at", "payload"],
 }
 
 _JSON_COLS = {"proposed", "corrected", "ask_embedding", "detail", "maps_to",
-              "schema"}
+              "schema", "payload"}
 _UPSERT_TABLES = {"glossary", "system_kb"}
 
 
@@ -53,7 +55,7 @@ class SqliteStore:
         cur.execute("""CREATE TABLE IF NOT EXISTS sessions (
             session_id TEXT PRIMARY KEY, req_id TEXT,
             turns TEXT, pending_questions TEXT, budget_spent INTEGER DEFAULT 0,
-            requester TEXT, created_at TEXT, updated_at TEXT)""")
+            requester TEXT, decisions TEXT, created_at TEXT, updated_at TEXT)""")
         for table, cols in LEDGER_TABLES.items():
             if table == "glossary":
                 cur.execute("""CREATE TABLE IF NOT EXISTS glossary (
@@ -75,116 +77,153 @@ class SqliteStore:
             cur.execute("ALTER TABLE edit_diffs ADD COLUMN provenance TEXT")
         except sqlite3.OperationalError:
             pass  # column already present
+        try:
+            cur.execute("ALTER TABLE sessions ADD COLUMN decisions TEXT")
+        except sqlite3.OperationalError:
+            pass
         self._conn.commit()
 
     async def put_version(self, obj: RequirementObject) -> None:
-        with self._lock:
-            try:
-                self._conn.execute(
-                    "INSERT INTO requirements (req_id, version, obj, created_at) VALUES (?,?,?,?)",
-                    (obj.req_id, obj.version, obj.model_dump_json(),
-                     datetime.now(timezone.utc).isoformat()))
-                self._conn.commit()
-            except sqlite3.IntegrityError as exc:
-                raise AppendOnlyViolation(
-                    f"{obj.req_id} v{obj.version} already exists") from exc
+        def _():
+            with self._lock:
+                try:
+                    self._conn.execute(
+                        "INSERT INTO requirements (req_id, version, obj, created_at) "
+                        "VALUES (?,?,?,?)",
+                        (obj.req_id, obj.version, obj.model_dump_json(),
+                         datetime.now(timezone.utc).isoformat()))
+                    self._conn.commit()
+                except sqlite3.IntegrityError as exc:
+                    raise AppendOnlyViolation(
+                        f"{obj.req_id} v{obj.version} already exists") from exc
+        await asyncio.to_thread(_)
 
     async def latest(self, req_id: str) -> RequirementObject:
-        row = self._conn.execute(
-            "SELECT obj FROM requirements WHERE req_id=? ORDER BY version DESC LIMIT 1",
-            (req_id,)).fetchone()
-        if row is None:
-            raise KeyError(req_id)
-        return RequirementObject.model_validate_json(row["obj"])
+        def _():
+            row = self._conn.execute(
+                "SELECT obj FROM requirements WHERE req_id=? "
+                "ORDER BY version DESC LIMIT 1",
+                (req_id,)).fetchone()
+            if row is None:
+                raise KeyError(req_id)
+            return RequirementObject.model_validate_json(row["obj"])
+        return await asyncio.to_thread(_)
 
     async def history(self, req_id: str) -> list[RequirementObject]:
-        rows = self._conn.execute(
-            "SELECT obj FROM requirements WHERE req_id=? ORDER BY version",
-            (req_id,)).fetchall()
-        return [RequirementObject.model_validate_json(r["obj"]) for r in rows]
+        def _():
+            rows = self._conn.execute(
+                "SELECT obj FROM requirements WHERE req_id=? ORDER BY version",
+                (req_id,)).fetchall()
+            return [RequirementObject.model_validate_json(r["obj"]) for r in rows]
+        return await asyncio.to_thread(_)
 
     async def version_timestamps(self, req_id: str) -> list[tuple[int, str]]:
-        rows = self._conn.execute(
-            "SELECT version, created_at FROM requirements WHERE req_id=? ORDER BY version",
-            (req_id,)).fetchall()
-        return [(r["version"], r["created_at"]) for r in rows]
+        def _():
+            rows = self._conn.execute(
+                "SELECT version, created_at FROM requirements WHERE req_id=? "
+                "ORDER BY version",
+                (req_id,)).fetchall()
+            return [(r["version"], r["created_at"]) for r in rows]
+        return await asyncio.to_thread(_)
 
     async def log(self, table: str, row: dict) -> None:
         if table not in LEDGER_TABLES:
             raise ValueError(f"unknown ledger table: {table}")
-        row = dict(row)
-        ts_col = {"glossary": "last_confirmed",
-                  "system_kb": "last_refreshed"}.get(table, "created_at")
-        row.setdefault(ts_col, datetime.now(timezone.utc).isoformat())
-        cols = [c for c in LEDGER_TABLES[table] if c in row]
-        vals = [json.dumps(row[c]) if c in _JSON_COLS else row[c] for c in cols]
-        with self._lock:
-            if table in _UPSERT_TABLES:
-                self._conn.execute(
-                    f"INSERT OR REPLACE INTO {table} ({','.join(cols)}) "
-                    f"VALUES ({','.join('?' * len(cols))})", vals)
-            else:
-                self._conn.execute(
-                    f"INSERT INTO {table} ({','.join(cols)}) "
-                    f"VALUES ({','.join('?' * len(cols))})", vals)
-            self._conn.commit()
+
+        def _():
+            data = dict(row)
+            ts_col = {"glossary": "last_confirmed",
+                      "system_kb": "last_refreshed"}.get(table, "created_at")
+            data.setdefault(ts_col, datetime.now(timezone.utc).isoformat())
+            cols = [c for c in LEDGER_TABLES[table] if c in data]
+            vals = [json.dumps(data[c]) if c in _JSON_COLS else data[c]
+                    for c in cols]
+            with self._lock:
+                if table in _UPSERT_TABLES:
+                    self._conn.execute(
+                        f"INSERT OR REPLACE INTO {table} ({','.join(cols)}) "
+                        f"VALUES ({','.join('?' * len(cols))})", vals)
+                else:
+                    self._conn.execute(
+                        f"INSERT INTO {table} ({','.join(cols)}) "
+                        f"VALUES ({','.join('?' * len(cols))})", vals)
+                self._conn.commit()
+        await asyncio.to_thread(_)
 
     async def query_ledger(self, table: str, **filters) -> list[dict]:
         if table not in LEDGER_TABLES:
             raise ValueError(f"unknown ledger table: {table}")
-        sql, vals = f"SELECT * FROM {table}", []
-        if filters:
-            sql += " WHERE " + " AND ".join(f"{k}=?" for k in filters)
-            vals = list(filters.values())
-        out = []
-        for r in self._conn.execute(sql, vals).fetchall():
-            d = dict(r)
-            for c in _JSON_COLS:
-                if d.get(c) is not None and isinstance(d[c], str):
-                    try:
-                        d[c] = json.loads(d[c])
-                    except (json.JSONDecodeError, ValueError):
-                        pass
-            out.append(d)
-        return out
+
+        def _():
+            sql, vals = f"SELECT * FROM {table}", []
+            if filters:
+                sql += " WHERE " + " AND ".join(f"{k}=?" for k in filters)
+                vals = list(filters.values())
+            out = []
+            for r in self._conn.execute(sql, vals).fetchall():
+                d = dict(r)
+                for c in _JSON_COLS:
+                    if d.get(c) is not None and isinstance(d[c], str):
+                        try:
+                            d[c] = json.loads(d[c])
+                        except (json.JSONDecodeError, ValueError):
+                            pass
+                out.append(d)
+            return out
+        return await asyncio.to_thread(_)
 
     async def put_session(self, session: dict) -> None:
-        with self._lock:
-            self._conn.execute(
-                """INSERT OR REPLACE INTO sessions
-                   (session_id, req_id, turns, pending_questions, budget_spent,
-                    requester, created_at, updated_at)
-                   VALUES (?,?,?,?,?,?,?,?)""",
-                (session["session_id"], session["req_id"],
-                 json.dumps(session.get("turns", [])),
-                 json.dumps(session.get("pending_questions", [])),
-                 session.get("budget_spent", 0),
-                 json.dumps(session.get("requester", {})),
-                 session.get("created_at", datetime.now(timezone.utc).isoformat()),
-                 datetime.now(timezone.utc).isoformat()))
-            self._conn.commit()
+        def _():
+            with self._lock:
+                self._conn.execute(
+                    """INSERT OR REPLACE INTO sessions
+                       (session_id, req_id, turns, pending_questions, budget_spent,
+                        requester, decisions, created_at, updated_at)
+                       VALUES (?,?,?,?,?,?,?,?,?)""",
+                    (session["session_id"], session["req_id"],
+                     json.dumps(session.get("turns", [])),
+                     json.dumps(session.get("pending_questions", [])),
+                     session.get("budget_spent", 0),
+                     json.dumps(session.get("requester", {})),
+                     json.dumps(session.get("decisions", [])),
+                     session.get("created_at",
+                                 datetime.now(timezone.utc).isoformat()),
+                     datetime.now(timezone.utc).isoformat()))
+                self._conn.commit()
+        await asyncio.to_thread(_)
 
     async def get_session(self, session_id: str) -> dict | None:
-        row = self._conn.execute(
-            "SELECT * FROM sessions WHERE session_id=?", (session_id,)).fetchone()
-        return self._session_dict(row) if row else None
+        def _():
+            row = self._conn.execute(
+                "SELECT * FROM sessions WHERE session_id=?",
+                (session_id,)).fetchone()
+            return self._session_dict(row) if row else None
+        return await asyncio.to_thread(_)
 
     async def list_sessions(self) -> list[dict]:
-        rows = self._conn.execute("SELECT * FROM sessions").fetchall()
-        return [self._session_dict(r) for r in rows]
+        def _():
+            rows = self._conn.execute("SELECT * FROM sessions").fetchall()
+            return [self._session_dict(r) for r in rows]
+        return await asyncio.to_thread(_)
 
     @staticmethod
     def _session_dict(row: sqlite3.Row) -> dict:
         d = dict(row)
-        for c in ("turns", "pending_questions", "requester"):
-            d[c] = json.loads(d[c]) if d.get(c) else ([] if c != "requester" else {})
+        for c in ("turns", "pending_questions", "requester", "decisions"):
+            raw = d.get(c)
+            if c == "requester":
+                d[c] = json.loads(raw) if raw else {}
+            else:
+                d[c] = json.loads(raw) if raw else []
         return d
 
     async def next_seq(self, year: int) -> int:
-        with self._lock:
-            self._conn.execute(
-                "INSERT INTO seq (year, n) VALUES (?, 1) "
-                "ON CONFLICT(year) DO UPDATE SET n = n + 1", (year,))
-            self._conn.commit()
-            return self._conn.execute(
-                "SELECT n FROM seq WHERE year=?", (year,)).fetchone()["n"]
+        def _():
+            with self._lock:
+                self._conn.execute(
+                    "INSERT INTO seq (year, n) VALUES (?, 1) "
+                    "ON CONFLICT(year) DO UPDATE SET n = n + 1", (year,))
+                self._conn.commit()
+                return self._conn.execute(
+                    "SELECT n FROM seq WHERE year=?", (year,)).fetchone()["n"]
+        return await asyncio.to_thread(_)

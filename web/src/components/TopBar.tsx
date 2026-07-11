@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { getHealth } from "../api";
-import { currentTheme, setTheme } from "../theme";
+import { currentTheme, setTheme, watchSystemTheme } from "../theme";
 import type { Theme } from "../theme";
 
 type HealthState =
@@ -15,16 +15,25 @@ export function TopBar() {
 
   useEffect(() => {
     let cancelled = false;
-    getHealth()
-      .then((h) => {
-        if (!cancelled) setHealth({ kind: "ok", provider: h.provider, store: h.store });
-      })
-      .catch(() => {
-        if (!cancelled) setHealth({ kind: "down" });
-      });
+    const poll = () => {
+      getHealth()
+        .then((h) => {
+          if (!cancelled) setHealth({ kind: "ok", provider: h.provider, store: h.store });
+        })
+        .catch(() => {
+          if (!cancelled) setHealth({ kind: "down" });
+        });
+    };
+    poll();
+    const id = window.setInterval(poll, 15000);
     return () => {
       cancelled = true;
+      window.clearInterval(id);
     };
+  }, []);
+
+  useEffect(() => {
+    return watchSystemTheme(() => setThemeState(currentTheme()));
   }, []);
 
   const toggleTheme = () => {
@@ -56,9 +65,12 @@ export function TopBar() {
           </svg>
         </span>
         <span className="wordmark">IntakePilot</span>
-        <nav className="topnav">
-          <NavLink to="/loop" end className={({ isActive }) => (isActive ? "navlink active" : "navlink")}>
+        <nav className="topnav" aria-label="Primary">
+          <NavLink to="/intake" end className={({ isActive }) => (isActive ? "navlink active" : "navlink")}>
             Intake
+          </NavLink>
+          <NavLink to="/triage" className={({ isActive }) => (isActive ? "navlink active" : "navlink")}>
+            Triage
           </NavLink>
           <NavLink to="/metrics" className={({ isActive }) => (isActive ? "navlink active" : "navlink")}>
             Metrics
@@ -70,6 +82,7 @@ export function TopBar() {
           className={
             health.kind === "ok" ? "health-dot ok" : health.kind === "down" ? "health-dot down" : "health-dot"
           }
+          aria-label={health.kind === "ok" ? "API online" : health.kind === "down" ? "API offline" : "Connecting"}
         />
         <span className="health-label">
           {health.kind === "ok" ? health.provider : health.kind === "down" ? "offline" : "connecting…"}

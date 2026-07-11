@@ -150,4 +150,5 @@ async def get_session(session_id: str, request: Request):
     return {"session_id": session_id, "req_id": session["req_id"],
             "draft": obj.model_dump(mode="json"),
             "pending_questions": session.get("pending_questions", []),
-            "turns": session.get("turns", [])}
+            "turns": session.get("turns", []),
+            "decisions": session.get("decisions", [])}

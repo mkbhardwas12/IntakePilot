@@ -19,13 +19,26 @@ class Msg:
     content: str
 
 
+def _strip_json_fence(text: str) -> str:
+    """Tolerate ```json ... ``` wrappers from OpenAI-compatible gateways."""
+    text = text.strip()
+    if not text.startswith("```"):
+        return text
+    lines = text.split("\n")
+    if lines and lines[0].lstrip().startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].strip() == "```":
+        lines = lines[:-1]
+    return "\n".join(lines).strip()
+
+
 @dataclass
 class LLMResult:
     text: str
     usage: dict = field(default_factory=dict)
 
     def json(self) -> Any:
-        return json.loads(self.text)
+        return json.loads(_strip_json_fence(self.text))
 
 
 @runtime_checkable
@@ -75,11 +88,12 @@ def _validate(data: Any, schema: dict) -> list[str]:
                     check(item, item_sch, f"{path}[{i}]")
         elif t == "string" and not isinstance(value, str) and value is not None:
             errors.append(f"{path}: expected string")
-        elif t == "number" and not isinstance(value, (int, float)):
-            errors.append(f"{path}: expected number")
+        elif t == "number":
+            # bool is a subclass of int in Python — reject it explicitly.
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                errors.append(f"{path}: expected number")
         elif t == "boolean" and not isinstance(value, bool):
             errors.append(f"{path}: expected boolean")
-
     check(data, schema, "$")
     return errors
 

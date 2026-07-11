@@ -23,6 +23,7 @@ ADMIN_PATHS = [
     ("GET", "/api/glossary/proposals"),
     ("POST", "/api/glossary"),
     ("POST", "/api/requirements/IPR-2099-000001/reroute"),
+    ("GET", "/api/triage"),
 ]
 
 

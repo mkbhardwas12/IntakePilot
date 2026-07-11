@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { confirmRequirement, getRender } from "../api";
 import type { ConfirmResponse, RequirementObject, SlotSchemaEntry } from "../types";
 import { editableString, formatValue } from "../format";
@@ -9,17 +9,23 @@ interface ConfirmViewProps {
   draft: RequirementObject;
   sessionId: string;
   schema: Record<string, SlotSchemaEntry> | null;
+  demoAutoConfirm?: boolean;
   onCancel: () => void;
   onConfirmed: (resp: ConfirmResponse) => void;
 }
 
-export function ConfirmView({ draft, sessionId, schema, onCancel, onConfirmed }: ConfirmViewProps) {
+export function ConfirmView({
+  draft, sessionId, schema, demoAutoConfirm, onCancel, onConfirmed
+}: ConfirmViewProps) {
   const toast = useToast();
   const [rendered, setRendered] = useState<string | null>(null);
   const [renderFailed, setRenderFailed] = useState(false);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const previouslyFocused = useRef<HTMLElement | null>(null);
+  const autoStarted = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,10 +41,47 @@ export function ConfirmView({ draft, sessionId, schema, onCancel, onConfirmed }:
     };
   }, [draft.req_id, sessionId]);
 
-  // backend_context is structured discovery data — rendered as its own card,
-  // not as a free-text editable field. Union with draft slots (request-type
-  // forks add slots beyond the default schema); reviewed shakiest-first:
-  // ascending confidence puts the fields most worth a human look on top.
+  // Focus trap + Escape closes (does not commit).
+  useEffect(() => {
+    previouslyFocused.current = document.activeElement as HTMLElement | null;
+    const panel = panelRef.current;
+    const focusable = () =>
+      panel
+        ? Array.from(
+            panel.querySelectorAll<HTMLElement>(
+              'button:not([disabled]), [href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])'
+            )
+          )
+        : [];
+    const first = focusable()[0];
+    first?.focus();
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && editingKey === null) {
+        e.preventDefault();
+        onCancel();
+        return;
+      }
+      if (e.key !== "Tab" || !panel) return;
+      const nodes = focusable();
+      if (nodes.length === 0) return;
+      const firstEl = nodes[0];
+      const lastEl = nodes[nodes.length - 1];
+      if (e.shiftKey && document.activeElement === firstEl) {
+        e.preventDefault();
+        lastEl.focus();
+      } else if (!e.shiftKey && document.activeElement === lastEl) {
+        e.preventDefault();
+        firstEl.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      previouslyFocused.current?.focus?.();
+    };
+  }, [onCancel, editingKey]);
+
   const slotKeys = Array.from(new Set([
     ...(schema ? Object.keys(schema) : []),
     ...Object.keys(draft.slots)
@@ -60,7 +103,12 @@ export function ConfirmView({ draft, sessionId, schema, onCancel, onConfirmed }:
   const submit = async () => {
     setSubmitting(true);
     try {
-      const resp = await confirmRequirement(draft.req_id, sessionId, changedEdits, "Demo User");
+      const resp = await confirmRequirement(
+        draft.req_id,
+        sessionId,
+        changedEdits,
+        draft.requester.name
+      );
       onConfirmed(resp);
     } catch (err: unknown) {
       toast(`Confirm failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -68,9 +116,17 @@ export function ConfirmView({ draft, sessionId, schema, onCancel, onConfirmed }:
     }
   };
 
+  useEffect(() => {
+    if (!demoAutoConfirm || autoStarted.current || submitting) return;
+    autoStarted.current = true;
+    const t = window.setTimeout(() => void submit(), 1100);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demoAutoConfirm]);
+
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-label="Review and confirm">
-      <div className="overlay-panel">
+      <div className="overlay-panel" ref={panelRef}>
         <div className="overlay-head">
           <div>
             <h2>Review &amp; confirm</h2>
@@ -105,7 +161,7 @@ export function ConfirmView({ draft, sessionId, schema, onCancel, onConfirmed }:
               <div key={key} className="confirm-slot-row">
                 <span className="slot-label">
                   {entry?.label ?? key.replace(/_/g, " ")}
-                  {entry?.required && <span className="required-mark">*</span>}
+                  {entry?.required && <span className="required-mark" aria-label="required">*</span>}
                 </span>
                 {editingKey === key ? (
                   <input
@@ -115,7 +171,15 @@ export function ConfirmView({ draft, sessionId, schema, onCancel, onConfirmed }:
                     onChange={(e) => setEdits((prev) => ({ ...prev, [key]: e.target.value }))}
                     onBlur={() => setEditingKey(null)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === "Escape") setEditingKey(null);
+                      if (e.key === "Enter") setEditingKey(null);
+                      if (e.key === "Escape") {
+                        setEdits((prev) => {
+                          const next = { ...prev };
+                          delete next[key];
+                          return next;
+                        });
+                        setEditingKey(null);
+                      }
                     }}
                   />
                 ) : (

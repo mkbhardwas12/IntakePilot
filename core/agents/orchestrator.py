@@ -45,6 +45,21 @@ CALIBRATION_SMOOTHING = 2        # pseudo-confirmations
 SKIP_VALUES = {"skip", "don't know", "dont know", "not sure", "unknown"}
 
 
+def _decision_source(raw: str | None) -> str | None:
+    """Normalize slot.source into a coarse X-ray source label."""
+    if not raw:
+        return None
+    if raw.startswith("glossary:") or raw.startswith("dept:"):
+        return "glossary"
+    if raw.startswith("precedent:"):
+        return "precedent"
+    if raw.startswith("system_kb"):
+        return "system_kb"
+    if "glossary:" in raw:
+        return "glossary"
+    return raw.split(":", 1)[0] if ":" in raw else raw
+
+
 async def calibrated_weights(store, bucket: str) -> dict[Provenance, float]:
     """Per-bucket provenance weights, learned from edit_diffs: if humans in
     this context routinely correct slots of a given provenance at
@@ -246,6 +261,17 @@ class Orchestrator:
             obj.touch("slot_revised", f"{key}: {proposed!r} -> {corrected!r}")
             await send("slot", {"key": key, "slot": obj.slots[key].model_dump()})
 
+        async def emit_decision(slot: str, action: str, reason: str,
+                                source: str | None = None) -> None:
+            """X-ray: real gap-ladder / fill decisions, not fake CoT."""
+            event = {"slot": slot, "action": action, "reason": reason,
+                     "source": source}
+            session.setdefault("decisions", []).append(event)
+            await send("decision", event)
+
+        # Snapshot used to attribute fills to ladder stages.
+        after_answers = {k: s.model_dump() for k, s in obj.slots.items()}
+
         # 1. EXTRACT (LLM proposes; code validates) — with correction exemplars.
         if user_msg.strip():
             await send("status", {"stage": "extracting"})
@@ -266,6 +292,16 @@ class Orchestrator:
                 degraded = True
                 obj.touch("extraction_failed", str(exc)[:300])
 
+        after_extract = {k: s.model_dump() for k, s in obj.slots.items()}
+        for key, slot_dump in after_extract.items():
+            if after_answers.get(key) != slot_dump:
+                slot = obj.slots[key]
+                if slot.provenance == Provenance.EXTRACTED:
+                    await emit_decision(
+                        key, "extracted",
+                        "Pulled from the requester's own words",
+                        slot.source)
+
         # 1b. VALUE: price the pain deterministically from the requester's
         # own words (duration × cadence). askable:false — never asked.
         if ("cost_of_delay" in schema.slots
@@ -278,13 +314,37 @@ class Orchestrator:
                     confidence=0.75, source="deterministic_value_extractor")
                 await send("slot", {"key": "cost_of_delay",
                                     "slot": obj.slots["cost_of_delay"].model_dump()})
+                await emit_decision(
+                    "cost_of_delay", "extracted",
+                    "Priced from duration × cadence in the ask",
+                    "deterministic_value_extractor")
 
         # 2. GAP LADDER (deterministic order: infer, then retrieve)
         await send("status", {"stage": "resolving_gaps"})
         gaps = gap_analyzer.open_required_slots(obj, schema)
         gaps = await gap_analyzer.infer_pass(obj, gaps, self.store, schema)
+        after_infer = {k: s.model_dump() for k, s in obj.slots.items()}
+        for key, slot_dump in after_infer.items():
+            if after_extract.get(key) != slot_dump:
+                slot = obj.slots[key]
+                if slot.provenance == Provenance.INFERRED:
+                    await emit_decision(
+                        key, "inferred",
+                        f"Inferred from requester context ({slot.source})",
+                        _decision_source(slot.source))
+
         gaps, _ = await precedent.retrieve_pass(obj, gaps, self.store,
                                                self.vector, schema)
+        after_retrieve = {k: s.model_dump() for k, s in obj.slots.items()}
+        for key, slot_dump in after_retrieve.items():
+            if after_infer.get(key) != slot_dump:
+                slot = obj.slots[key]
+                if slot.provenance == Provenance.RETRIEVED:
+                    await emit_decision(
+                        key, "retrieved",
+                        f"Retrieved without asking ({slot.source})",
+                        _decision_source(slot.source))
+
         for key, slot in obj.slots.items():
             if before.get(key) != slot.model_dump():
                 await send("slot", {"key": key, "slot": slot.model_dump()})
@@ -308,16 +368,45 @@ class Orchestrator:
             questions = [q for q in questions
                          if schema.slots[q.slot_key].askable][:n]
             obj.question_budget.spent += len(questions)
+            because_by = {g.key: g.because for g in ranked}
             for q in questions:
                 obj.touch("question_asked", f"{q.slot_key}: {q.text}")
+                await emit_decision(
+                    q.slot_key, "asked",
+                    q.because or because_by.get(q.slot_key, "Needs a human answer"),
+                    None)
 
         # 4. BUDGET EXHAUSTED -> assumptions with stated defaults
         if interactive and not questions:
+            remaining_before_defaults = list(gaps)
             obj = apply_defaults(obj, remaining=gaps, schema=schema)
             for key in obj.assumptions:
                 slot = obj.slots.get(key)
                 if slot and before.get(key) != slot.model_dump():
                     await send("slot", {"key": key, "slot": slot.model_dump()})
+                    await emit_decision(
+                        key, "assumed",
+                        slot.default_reason or "Org default — budget exhausted",
+                        "schema_default")
+            for key in remaining_before_defaults:
+                if gap_analyzer.is_empty(obj.slots.get(key)):
+                    await emit_decision(
+                        key, "skipped",
+                        "Left open for tech enrichment or later turns",
+                        None)
+
+        # Emit answered / edited decisions for this turn's human fills.
+        for key, slot in obj.slots.items():
+            if before.get(key) == slot.model_dump():
+                continue
+            if slot.provenance == Provenance.ANSWERED:
+                await emit_decision(
+                    key, "answered", "Human answered a budgeted question",
+                    slot.source)
+            elif slot.provenance == Provenance.EDITED and key in revisions:
+                await emit_decision(
+                    key, "edited", "Human revised the Shadow Draft",
+                    "mid_session_revision")
 
         # 5. READINESS + RENDER + PERSIST (append version, stream deltas)
         await send("status", {"stage": "scoring"})

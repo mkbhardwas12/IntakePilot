@@ -1,6 +1,8 @@
 """Requirements router — latest, history, plain-language render, confirm."""
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
@@ -10,6 +12,8 @@ from core.models import Confirmation, Provenance, Slot, Status, coerce_edit
 from core.agents import acceptance, enrichment, impact, precedent, renderer
 from core.gates import pipeline, routing
 from core.learning import exemplars as learning
+
+logger = logging.getLogger("intakepilot.requirements")
 
 router = APIRouter(prefix="/api/requirements", tags=["requirements"])
 
@@ -310,6 +314,7 @@ async def _confirm_locked(ctx, req_id: str, body: ConfirmBody):
 
     ticket = None
     acceptance_scenarios: list = []
+    ticket_title = ticket_body = None
     if all(g.passed for g in gates):
         # I3: the third handoff artifact — checkable Given/When/Then generated
         # from the confirmed (gate-passed, therefore measurable) requirement.
@@ -318,24 +323,38 @@ async def _confirm_locked(ctx, req_id: str, body: ConfirmBody):
             await ctx.store.log("outcome_ledger", {
                 "req_id": req_id, "stage": "acceptance", "verdict": "generated",
                 "detail": {"count": len(acceptance_scenarios)}})
-        title, ticket_body = renderer.ticket_render(obj, schema)
+        ticket_title, ticket_body = renderer.ticket_render(obj, schema)
         ticket_body += impact.collision_section(collision_hits)
         ticket_body += acceptance.section(acceptance_scenarios)
-        ticket = await ctx.target.create_item(obj, title, ticket_body, decision.queue)
         obj.status = Status.ROUTED
         # Re-index with the final slots AND the queue: this is the routing
         # classifier's precedent signal for future intakes.
         await precedent.index_requirement(ctx.vector, obj, queue=decision.queue)
-        obj.touch("routed", f"queue={decision.queue} ticket={ticket.ref}")
-        await ctx.store.log("outcome_ledger", {
-            "req_id": req_id, "stage": "routed", "verdict": "created",
-            "detail": {"queue": decision.queue, "ticket": ticket.model_dump()}})
+        obj.touch("routed", f"queue={decision.queue}")
     else:
         obj.status = Status.GATED
         obj.touch("gated", "; ".join(
             f"gate{g.gate}: {g.reason}" for g in gates if not g.passed))
 
+    # Persist the routed/gated version BEFORE external ticket create so a
+    # target failure cannot leave an orphan ticket with no store row.
     await ctx.store.put_version(obj)
+
+    if obj.status == Status.ROUTED and ticket_title is not None:
+        try:
+            ticket = await ctx.target.create_item(
+                obj, ticket_title, ticket_body, decision.queue)
+            await ctx.store.log("outcome_ledger", {
+                "req_id": req_id, "stage": "routed", "verdict": "created",
+                "detail": {"queue": decision.queue,
+                           "ticket": ticket.model_dump()}})
+        except Exception as exc:
+            logger.exception("ticket create failed for %s: %s", req_id, exc)
+            await ctx.store.log("outcome_ledger", {
+                "req_id": req_id, "stage": "routed", "verdict": "ticket_failed",
+                "detail": {"queue": decision.queue, "error": str(exc)[:300]}})
+            ticket = None
+
     return {"draft": obj.model_dump(mode="json"),
             "gates": [g.model_dump() for g in gates],
             "routing": decision.model_dump(),

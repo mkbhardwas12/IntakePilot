@@ -5,6 +5,7 @@ import os
 
 import httpx
 
+from core.providers.http_retry import request_with_retries
 from core.providers.llm.base import LLMResult, Msg
 
 
@@ -45,8 +46,9 @@ class OpenAICompatLLM:
                 "json_schema": {"name": "output", "schema": json_schema, "strict": False},
             }
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            resp = await client.post(f"{self.base_url}/chat/completions",
-                                     json=payload, headers=self._headers())
+            resp = await request_with_retries(
+                client, "POST", f"{self.base_url}/chat/completions",
+                json=payload, headers=self._headers())
             resp.raise_for_status()
             data = resp.json()
         return LLMResult(text=data["choices"][0]["message"]["content"],
@@ -54,8 +56,9 @@ class OpenAICompatLLM:
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            resp = await client.post(f"{self.base_url}/embeddings",
-                                     json={"model": self.embed_model, "input": texts},
-                                     headers=self._headers())
+            resp = await request_with_retries(
+                client, "POST", f"{self.base_url}/embeddings",
+                json={"model": self.embed_model, "input": texts},
+                headers=self._headers())
             resp.raise_for_status()
             return [d["embedding"] for d in resp.json()["data"]]
