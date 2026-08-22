@@ -28,6 +28,7 @@ from core.models import (ExtractionError, Provenance, Question,
 from core.agents import gap_analyzer, intake, precedent, question_composer
 from core.agents import value as value_agent
 from core.learning import exemplars as learning
+from core.export import manas_demand
 
 Emit = Callable[[str, dict], Awaitable[None]]
 
@@ -212,6 +213,10 @@ class Orchestrator:
                 "req_id": obj.req_id, "slot_key": key,
                 "question": (q or {}).get("text", ""), "outcome": "answered",
                 "changed_routing": False, "changed_slots": 1})
+            await manas_demand.emit_asked(
+                obj.req_id, key,
+                manas_demand.hash_slot_value(value),
+                Provenance.ANSWERED.value, obj.context_bucket)
         for qid, q in pending.items():
             if interactive and qid not in answered_ids:
                 await self.store.log("question_ledger", {
@@ -288,6 +293,11 @@ class Orchestrator:
         for key, slot in obj.slots.items():
             if before.get(key) != slot.model_dump():
                 await send("slot", {"key": key, "slot": slot.model_dump()})
+                if slot.provenance == Provenance.EXTRACTED:
+                    await manas_demand.emit_asked(
+                        obj.req_id, key,
+                        manas_demand.hash_slot_value(slot.value),
+                        slot.provenance.value, obj.context_bucket)
 
         # 3. QUESTIONS (budget enforced in code, NOT in prompt)
         if self.cfg.budget_dynamic:

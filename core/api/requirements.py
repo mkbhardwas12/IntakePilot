@@ -10,6 +10,7 @@ from core.models import Confirmation, Provenance, Slot, Status, coerce_edit
 from core.agents import acceptance, enrichment, impact, precedent, renderer
 from core.gates import pipeline, routing
 from core.learning import exemplars as learning
+from core.export import manas_demand
 
 router = APIRouter(prefix="/api/requirements", tags=["requirements"])
 
@@ -241,6 +242,12 @@ async def _confirm_locked(ctx, req_id: str, body: ConfirmBody):
             ctx.store, ctx.vector, obj, key, proposed, corrected,
             provenance=(current.provenance.value
                         if current and current.provenance else None))
+        await manas_demand.emit_corrected(
+            obj.req_id, key,
+            manas_demand.hash_slot_value(proposed),
+            manas_demand.hash_slot_value(corrected),
+            current.provenance.value if current and current.provenance else None,
+            obj.context_bucket)
         obj.slots[key] = Slot(value=corrected, provenance=Provenance.EDITED,
                               confidence=1.0, source="confirmation_edit")
         if key in obj.assumptions:

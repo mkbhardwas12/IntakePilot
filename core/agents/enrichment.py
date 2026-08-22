@@ -24,6 +24,7 @@ import re
 from datetime import datetime, timezone
 
 from core.models import Provenance, RequirementObject, Slot
+from core.export import manas_demand
 
 _STOPWORDS = {
     "a", "an", "and", "as", "at", "be", "by", "for", "from", "i", "in", "info",
@@ -122,6 +123,12 @@ async def enrich(obj: RequirementObject, store, vector, connectors,
     obj.touch("enriched",
               f"{len(entities)} entities, {n_custom} customization(s) "
               f"discovered via {', '.join(sources)}")
+    
+    implicated_fields = manas_demand.extract_implicated_fields(value)
+    if implicated_fields:
+        await manas_demand.emit_observed(
+            obj.req_id, implicated_fields, obj.context_bucket)
+    
     return value
 
 
