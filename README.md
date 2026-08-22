@@ -284,6 +284,36 @@ Swap the fixture for a real connector (SAP OData/RFC, database catalog) by
 implementing the three-method protocol and pointing `intakepilot.yaml`
 (`connector:` / `connectors:`) at it.
 
+## MANAS Demand exporter
+
+IntakePilot includes a metadata-only exporter hook (`core/export/manas_demand.py`)
+that emits CloudEvents-shaped records for downstream MANAS smriti compilation.
+Three event types are emitted:
+
+| Event type | Emit point | Contents |
+|---|---|---|
+| `io.manas.demand.asked` | Slot filled (extracted/answered) | Slot key, SHA256 hash of value, provenance |
+| `io.manas.demand.corrected` | Edit diff captured at confirmation | Slot key, hashes of proposed and corrected, provenance |
+| `io.manas.demand.observed` | Backend enrichment discovers entities | Implicated fields metadata: table, field name, kind, owner_team |
+
+**Hard rules enforced in code** (not prompt):
+
+- **Metadata never row data**: no VIN/IBAN/email/PAN or any PII in props
+- **Hash all free text**: SHA256 of UTF-8; store hashes + slot names + provenance, not ask text
+- **No environment identifiers**: no hostnames, SIDs, landscape names
+- **LLM never in control**: emit/gate/routing decisions are deterministic code
+- Only askable slots (`business_outcome`, `success_criteria`, `refresh_frequency`,
+  `data_fields`, `urgency`) emit `asked` and `corrected` events
+
+The exporter is **off by default** (NullSink). Enable it via `configure_sink()`:
+
+```python
+from core.export.manas_demand import configure_sink, ListSink, FileSink
+
+configure_sink(file_path="/var/log/manas_demand.jsonl")  # append-only file
+configure_sink(sink=ListSink())                          # in-memory (tests)
+```
+
 ## Theming
 
 The UI follows `docs/DESIGN-GUIDELINES.md`: every color flows through
