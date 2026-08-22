@@ -2,7 +2,11 @@
 
 **Status:** actionable architecture recommendation, not a claim of deployed integration
 
-**Repository evidence reviewed:** checked-out `main` at `42c1280`, plus unmerged local refs `pr-1-demand` and `pr-2-admit`
+**Repository source-code evidence reviewed:** `42c1280`; current `main` at `0501575` adds the initial version of this
+recommendation document but no product-code change, plus unmerged local refs `pr-1-demand` and `pr-2-admit`
+
+**MANAS consumer baseline:** `f3eca04`; implementation must pin the reviewed MANAS catalog and shared-fixture digest
+in both repositories. No schema digest is asserted by this document.
 
 **Last reviewed:** 2026-08-22
 
@@ -83,7 +87,7 @@ These refs are valuable prototypes, but they must not be described as current ch
 - provides off/list/file sinks, not an authenticated, acknowledged, replayable MANAS transport;
 - has no organization-local semantic mode, so hashes alone cannot support useful intent similarity or cited reasoning inside an authorized organization.
 
-Repository integration also needs care: checked-out `main` is currently 82 commits ahead of and 69 commits behind `origin/main`, while both prototype refs are based on `origin/main`. Port or rebase the relevant work with conflict review; do not merge either worktree blindly or assume its tests exercise the checked-out product history.
+Repository integration also needs care: checked-out `main` is currently 83 commits ahead of and 69 commits behind `origin/main`, while both prototype refs are based on `origin/main`. Port or rebase the relevant work with conflict review; do not merge either worktree blindly or assume its tests exercise the checked-out product history.
 
 The right next step is to preserve its tests and metadata-minimization intent while replacing its envelope, identity, trust, delivery, and verification semantics with the contract below.
 
@@ -130,7 +134,13 @@ Rules:
 
 ## Target event envelope
 
-Use CloudEvents 1.0 semantics with an IntakePilot source URI, a stable subject, and a versioned data schema. Example:
+There are two distinct contracts. IntakePilot may keep a source-native domain envelope and names such as
+`io.intakepilot.intent.*`, but MANAS does not admit that shape directly. The outbound adapter must deterministically
+translate every source-native record to the canonical MANAS wire catalog in
+`MANAS:orgbrain/docs/SOURCE_SYSTEM_FEED_CONTRACTS.md`. Alternatively, IntakePilot may emit that exact MANAS profile
+from its transactional outbox. Mixing fields from the two profiles is invalid.
+
+The following is a **source-native example**, not a MANAS-admissible wire event:
 
 ```json
 {
@@ -166,9 +176,33 @@ Use CloudEvents 1.0 semantics with an IntakePilot source URI, a stable subject, 
 }
 ```
 
+For source-native `io.intakepilot.intent.execution_scope_confirmed.v1`—not the generic
+`io.intakepilot.intent.confirmed.v1` example above—the currently implemented execution-scope mapping is exact:
+
+| Source-native concept | Required MANAS wire value |
+|---|---|
+| source-native event and MANAS type | `io.intakepilot.intent.execution_scope_confirmed.v1` → `io.manas.demand.executionscope.confirmed.v1` |
+| source and lobe | `//manas/demand/intakepilot`; `demand` |
+| subject | canonical `scope:<source_instance>:<requirement>@v<version>:<scope_id>` |
+| partition and entity refs | tenant + source-qualified requirement partition; ordered scope, requirement-version, and workload refs |
+| privacy/profile fields | `tenant`, `piiscrubbed=true`, `scrubpolicy=scrub/2026.08`, `schemaversion=1.0.0`, `dataclassification=internal`, `datacategory=non-pii`, `dataschema=urn:manas:schema:io.manas.demand.executionscope.confirmed.v1:1.0.0`, and `recordedtime=confirmed_at` |
+| provenance | `agent=svc:demand/intakepilot@manas-export-v1`, `activity=export.outbox`, `used=[source_binding, approval_receipt_commitment]`, and no derived refs |
+| closed payload | exactly `scope_ref`, `scope_id`, `source_instance_id`, `source_binding`, `source_kind=execution_scope`, `requirement_ref`, `requirement_id`, `requirement_version`, `workload_ref`, `workload_source_binding`, `scope_status`, `acceptance_criterion_commitment`, `commitment_policy`, `approval_receipt_commitment`, `confirmation_method=human`, `confirmed_by_role`, `confirmation_policy`, `source_schema_name`, `source_schema_version`, and `confirmed_at`; no other keys |
+
+The mapper must fail closed on any field it cannot represent exactly. A source-native ID, source URI, or privacy flag
+does not automatically become its MANAS equivalent.
+
+Exact-binding claims in this document apply to the closed execution-scope/workload/selection slice. Legacy MANAS
+Demand schemas with unqualified or name-derived identity remain replay-compatible but need an operator trust tier and
+migration or quarantine before they can influence a governed cross-product recommendation.
+
 Event IDs must be stable for the same committed source version and event type, or the outbox must persist a generated ID in the same transaction. Replaying an outbox row must produce the same ID.
 
-### Minimum event catalog
+### Source-native domain catalog
+
+These names describe IntakePilot domain facts. They are not a second MANAS wire catalog. Only a type ratified in the
+canonical MANAS catalog may cross the Event Spine; the execution-scope mapping above is the only new mapping in this
+document that is implemented at MANAS baseline `f3eca04`.
 
 | Event | Emit only after | Purpose |
 |---|---|---|
@@ -220,11 +254,26 @@ IntakePilot validates the target schema and tenant, displays the citations, and 
 ### Demand authority in MANAS selection analysis
 
 BasisPilot may attest how a job, report, or CDS workload selected data; it cannot attest why the business needed that
-scope. The target `execution_scope_confirmed` event should issue an immutable source-qualified evidence reference, the
+scope. MANAS now has a local closed `io.manas.demand.executionscope.confirmed.v1` consumer and graph-backed governed wrapper.
+The event issues an immutable source-qualified evidence reference, the
 exact IntakePilot requirement version, a bounded status (`full_scope_required` or `bounded_scope_required`), an
-acceptance-criterion commitment, confirmation policy/version, and observation time. MANAS supplies this fact separately
-to its deterministic selection evaluator. A Run event that self-declares business scope must be rejected and can never
-authorize `broad_by_design`.
+acceptance-criterion and approval-receipt HMAC-form commitments, confirmation policy/version, exact workload identity/deployment binding,
+and observation time. Today those HMAC-form commitments are producer assertions whose syntax is checked; MANAS does not
+yet bind a tenant key ID/policy, recompute them, or verify rotation state. MANAS projects the event separately and its
+graph-backed governed wrapper verifies exact graph edges and immutable receipts before supplying scope to the policy
+primitive; that wrapper accepts no caller binding flags or scope status. The lower-level pure policy primitive does
+accept explicit, already-trusted inputs and must not be exposed as a producer authority path. A Run event that self-declares
+business scope is rejected and can never authorize `broad_by_design`. Full scope plus a narrow/expected observed
+selection now produces a functional scope-conformance review rather than a false broad-by-design conclusion.
+
+The `RequirementVersion` node in this local slice is a source-attested proxy created from the same scope event, not an
+independent join to a separately admitted IntakePilot requirement-version receipt. This is consumer proof, not an
+IntakePilot producer claim. The wrapper is exercised as local library/test code; it is not an ingestion hook, remote
+MCP/API gate, persisted Decision, or human workflow. Successful assessments cite selection, workload, and scope events;
+an abstaining result may have fewer citations because resolution stopped at the first missing or incoherent authority.
+Current `main` still lacks the explicit bounded-scope control,
+authenticated reviewer role, tenant/source instance, atomic requirement-version/approval/outbox commit, and operator-
+authenticated route. MANAS labels the present trust `local_contract_only` until those controls exist.
 
 ## Two privacy modes—not one
 
@@ -302,6 +351,8 @@ Required building blocks:
 - Decide organization-local versus federation profiles and document their field allowlists.
 - Rework the `pr-1-demand` prototype against this contract; keep useful minimization/admissibility fixtures from both local refs.
 - Add architecture decision records for authority, corrections, retention, and proposal review.
+- Define the tenant key/policy registry for Demand commitments: key ID/version, allowed purpose, rotation/retirement,
+  recomputation/verification, and negative cross-tenant tests. HMAC-shaped text alone is not verification.
 
 **Acceptance criteria**
 
@@ -328,13 +379,24 @@ Required building blocks:
 - Publish asynchronously with stable IDs, retry/backoff, signing, receipts, and dead-letter handling.
 - Emit the minimum catalog at committed domain boundaries, not inline before persistence.
 - Emit confirmed execution scope as a separate source-issued demand fact; never copy a BasisPilot runtime label into demand authority.
+- Match MANAS's closed v1 contract exactly: requirement version, workload ref and deployment binding, two-value scope
+  status, criterion/approval HMAC-form commitments, bounded human role and policy/schema metadata, and confirmation time; no raw prose.
+- Establish a pre-run identity handoff. BasisPilot/SAP scheduling or another registered Run authority allocates the
+  immutable future `workload_ref`, `workload_source_binding`, and intended observation window before execution. MANAS may
+  validate and relay that attestation but may not originate it. IntakePilot presents those exact refs to the authorized
+  business reviewer and atomically commits the requirement version, approval receipt, scope confirmation, and outbox row
+  with `confirmed_at <= window_start`. The later Basis observation must reuse the same ref/binding; until it arrives,
+  MANAS retains the scope event as a pending dependency and does not manufacture a workload.
 - Add replay tooling by tenant, time range, requirement, and event type.
 
 **Acceptance criteria**
 
 - Failure injection between source commit, publish, receipt, and retry produces no lost committed events and no duplicate effect in MANAS.
 - Replaying the same 10,000 outbox rows yields one MANAS observation per event ID.
-- A conformance test proves that only a bound IntakePilot/human scope evidence ref—not a BasisPilot assertion—can satisfy MANAS's business-scope gate.
+- A conformance test proves that only an exact admitted IntakePilot scope receipt and scope-to-workload edge—not a
+  BasisPilot assertion or caller boolean—can satisfy the business-scope condition in MANAS's graph-backed governed assessment.
+- A chronology test rejects a scope confirmed after the planned workload starts, a Basis observation that changes the
+  pre-issued workload ref/binding, and a cross-tenant or unregistered handoff.
 - MANAS downtime adds no more than 5% to IntakePilot request p95 latency.
 - After recovery, 99% of eligible events are acknowledged within 60 seconds; every remainder is visible with a reason.
 
