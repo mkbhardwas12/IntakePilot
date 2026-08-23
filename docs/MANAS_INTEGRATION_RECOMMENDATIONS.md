@@ -5,10 +5,60 @@
 **Repository source-code evidence reviewed:** `42c1280`; current `main` at `0501575` adds the initial version of this
 recommendation document but no product-code change, plus unmerged local refs `pr-1-demand` and `pr-2-admit`
 
-**MANAS consumer baseline:** `f3eca04`; implementation must pin the reviewed MANAS catalog and shared-fixture digest
-in both repositories. No schema digest is asserted by this document.
+**MANAS consumer baseline:** `0.1.0` exact-thread contract baseline. Producer work must pin the reviewed MANAS commit,
+catalog subset, and shared-fixture digest in both repositories; this recommendation does not invent a schema digest.
 
-**Last reviewed:** 2026-08-22
+**Last reviewed:** 2026-08-23
+
+## MANAS 0.1.0 exact-thread integration delta
+
+MANAS `0.1.0` now has executable, closed consumers for the complete redacted change thread. The two IntakePilot-owned
+facts in that thread are:
+
+| MANAS contract | Why IntakePilot must issue it | Source fact that must remain in IntakePilot |
+|---|---|---|
+| `io.manas.demand.requirement.versioned.v2` | Establishes the exact, immutable business-intent version and one explicit change reference that CleanCore and BasisPilot must reuse. It prevents a ticket label, copied ID, or similar field name from becoming an inferred join. | Original ask, typed version, changed-field history, clarification evidence, accepted assumptions, confirmation, request schema/version, and the authoritative mapping between `requirement_ref` and `change_ref`. |
+| `io.manas.demand.outcome.adjudicated.v1` | Closes the loop only after an identified business owner or product owner judges the deployed result. This is the reviewed evidence MANAS may use for similar-change memory; delivery status alone is not success. | Full outcome evidence, reviewer authority, any narrative/rationale, source ACL, deployment citation, decision history, and later corrections. |
+
+The `requirement.versioned.v2` outbox record must use the exact closed payload: source-qualified requirement and change
+refs, immutable source binding, status `ready_for_build`, bounded request type, HMAC-form intent and acceptance-criteria
+commitments, commitment policy, source schema name/version, and registration time. The
+`outcome.adjudicated.v1` record must bind the exact deployment, requirement, and change refs plus their immutable source
+bindings; it carries only the bounded verdict, human method/role, evidence hash, adjudication commitment/policy, and
+time. Raw business narratives, names, email addresses, generated code, and source rows remain outside the default event.
+
+### Required IntakePilot source work
+
+1. Add an authenticated, tenant-scoped transactional outbox. The authoritative requirement version or outcome,
+   approval/adjudication receipt, and deterministic event row commit atomically; MANAS availability never controls the
+   user transaction.
+2. Persist one organization-governed `change_ref` before build handoff and reuse it without reconstruction. Keep all
+   source refs, bindings, event IDs, schema versions, receipts, publish attempts, acknowledgements, and dead-letter
+   state for deterministic replay and audit.
+3. Make the 12 MANAS golden pilot questions a sponsor-approved, versioned pilot artifact before observation begins.
+   IntakePilot must retain who accepted the catalog, when it was accepted, the original need and manual-handoff
+   baseline for each sampled change, and the source evidence used to answer each question. The catalog is an evaluation
+   agreement, not an event payload and not permission to manufacture missing historical identifiers.
+4. Emit `outcome.adjudicated.v1` only after the exact BasisPilot deployment receipt is available and an authenticated
+   `business_owner` or `product_owner` chooses `achieved`, `partially_achieved`, or `not_achieved`. A Jira state,
+   model score, or MANAS suggestion cannot issue this fact.
+
+### Acceptance gates before any live feed claim
+
+- Positive and negative shared fixtures validate against the pinned MANAS `0.1.0` schemas; unknown keys, missing
+  bindings, wrong tenant, stale version, duplicate-key JSON, invalid chronology, and cross-thread refs fail closed.
+- Retrying or replaying the same committed outbox event produces the same event ID and graph result; source history is
+  never rewritten.
+- An end-to-end conformance case resolves requirement version → CleanCore proposal/review/test → BasisPilot
+  transport/deployment → IntakePilot outcome using exact refs and temporal evidence only.
+- DLP, tenant-isolation, authorization, retention, restriction, dead-letter, recovery, and source-versus-MANAS receipt
+  reconciliation tests pass before the exporter is enabled.
+- The sponsor accepts the fixed question catalog and pilot entry criteria; later question changes are a new catalog
+  version and cannot retroactively improve a score.
+
+**Current truth:** these two MANAS consumers and a redacted conformance thread exist in the MANAS repository. This
+IntakePilot checkout still has no merged native producer, transactional outbox, pinned live route, sponsor-accepted
+pilot catalog, production receipt, or field-pilot evidence. “Contract-ready consumer” is not “deployed integration.”
 
 ## Executive decision
 
@@ -192,17 +242,20 @@ For source-native `io.intakepilot.intent.execution_scope_confirmed.v1`—not the
 The mapper must fail closed on any field it cannot represent exactly. A source-native ID, source URI, or privacy flag
 does not automatically become its MANAS equivalent.
 
-Exact-binding claims in this document apply to the closed execution-scope/workload/selection slice. Legacy MANAS
-Demand schemas with unqualified or name-derived identity remain replay-compatible but need an operator trust tier and
-migration or quarantine before they can influence a governed cross-product recommendation.
+Exact-binding claims in this document apply to the closed requirement/change thread and the separate governed
+execution-scope/workload/selection slice. Legacy MANAS Demand schemas with unqualified or name-derived identity remain
+replay-compatible but need an operator trust tier and migration or quarantine before they can influence a governed
+cross-product recommendation.
 
 Event IDs must be stable for the same committed source version and event type, or the outbox must persist a generated ID in the same transaction. Replaying an outbox row must produce the same ID.
 
 ### Source-native domain catalog
 
 These names describe IntakePilot domain facts. They are not a second MANAS wire catalog. Only a type ratified in the
-canonical MANAS catalog may cross the Event Spine; the execution-scope mapping above is the only new mapping in this
-document that is implemented at MANAS baseline `f3eca04`.
+canonical MANAS catalog may cross the Event Spine. At the MANAS `0.1.0` baseline, the Demand mappings implemented for
+this program are `io.manas.demand.requirement.versioned.v2`,
+`io.manas.demand.outcome.adjudicated.v1`, and the separate
+`io.manas.demand.executionscope.confirmed.v1`; this repository does not yet produce them.
 
 | Event | Emit only after | Purpose |
 |---|---|---|
