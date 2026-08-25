@@ -7,12 +7,24 @@ export interface Budget { max: number; per_turn: number; spent: number; }
 export interface Confirmation { confirmed_by: string; confirmed_at: string; edits: number; }
 export interface RoutingDecision { queue: string; confidence: number; explanation: string; alternatives: { queue: string; score: number }[]; }
 export interface AuditEvent { event: string; at: string; detail: string; }
+export interface ProcessMatch { key: string; label: string; confidence: number; evidence: string[]; }
+export interface UnstatedNeed { need: string; why: string; status: "open" | "covered"; covered_by: string | null; }
+export interface AnalystRisk { risk: string; why: string; }
+export interface AnalystRead {
+  process: ProcessMatch | null;
+  interpretation: string;
+  interpretation_source: "llm" | "deterministic";
+  unstated_needs: UnstatedNeed[];
+  risks: AnalystRisk[];
+  kpis: string[];
+}
 export interface RequirementObject {
   req_id: string; version: number; status: Status; requester: Requester;
   ask_verbatim: string; slots: Record<string, Slot>; question_budget: Budget;
   assumptions: string[]; readiness_score: number;
   confirmation: Confirmation | null; routing: RoutingDecision | null; audit: AuditEvent[];
   request_type: string;
+  analyst?: AnalystRead | null;
 }
 export interface Question { id: string; slot_key: string; text: string; because: string; options: string[] | null; }
 export interface BackendCustomization { name: string; type: string; description: string; owner_team: string; kind: string; }

@@ -5,6 +5,7 @@ import type { ConfirmResponse, DecisionEvent, Question, RequirementObject, SlotS
 import { useToast } from "../toast";
 import { Chat } from "../components/Chat";
 import type { ChatMessage } from "../components/Chat";
+import { AnalystReadCard } from "../components/AnalystReadCard";
 import { ShadowDraft } from "../components/ShadowDraft";
 import { DecisionRail } from "../components/DecisionRail";
 import { ConfirmView } from "../components/ConfirmView";
@@ -212,6 +213,9 @@ export function IntakePage() {
             onDecision: (d) => setDecisions((prev) => [...prev, d]),
             onReadiness: (score) => {
               setDraft((d) => (d ? { ...d, readiness_score: score } : d));
+            },
+            onAnalyst: (read) => {
+              setDraft((d) => (d ? { ...d, analyst: read } : d));
             }
           },
           ac.signal
@@ -416,6 +420,7 @@ export function IntakePage() {
           onRevise={(key, value) => void reviseSlot(key, value)}
           onConfirm={() => setView("confirm")}
         />
+        {draft?.analyst && <AnalystReadCard read={draft.analyst} />}
         <DecisionRail decisions={decisions} schemaLabels={schemaLabels} />
       </div>
       {view === "confirm" && draft && sessionId && (

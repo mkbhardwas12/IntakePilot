@@ -1,4 +1,5 @@
 import type {
+  AnalystRead,
   AttachmentReport,
   ConfirmResponse,
   DecisionEvent,
@@ -48,7 +49,7 @@ export interface TurnRequestBody {
   revisions?: Record<string, string>;
 }
 
-export type TurnStage = "extracting" | "resolving_gaps" | "composing_questions" | "scoring";
+export type TurnStage = "extracting" | "resolving_gaps" | "composing_questions" | "interpreting" | "scoring";
 
 export interface TurnStreamHandlers {
   onStatus?: (stage: TurnStage) => void;
@@ -56,6 +57,7 @@ export interface TurnStreamHandlers {
   onDecision?: (decision: DecisionEvent) => void;
   onReadiness?: (score: number) => void;
   onQuestions?: (questions: Question[]) => void;
+  onAnalyst?: (read: AnalystRead) => void;
 }
 
 async function toJson<T>(res: Response): Promise<T> {
@@ -296,6 +298,9 @@ export async function sendTurn(
           break;
         case "questions":
           handlers.onQuestions?.((payload as { questions: Question[] }).questions);
+          break;
+        case "analyst":
+          handlers.onAnalyst?.(payload as AnalystRead);
           break;
         case "done":
           result = payload as TurnResult;

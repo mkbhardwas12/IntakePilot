@@ -21,6 +21,15 @@ def business_render(obj: RequirementObject, schema: SlotSchema) -> str:
     outcome = obj.slots.get("business_outcome")
     if outcome and outcome.value:
         lines += [f"**What should change:** {_fmt(outcome.value)}", ""]
+    if obj.analyst and obj.analyst.interpretation:
+        placed = (f" _(placed in {obj.analyst.process.label})_"
+                  if obj.analyst.process else "")
+        lines += [f"**Analyst's read:** {obj.analyst.interpretation}{placed}", ""]
+        open_needs = [n for n in obj.analyst.unstated_needs if n.status == "open"]
+        if open_needs:
+            lines.append("_Worth deciding before build:_")
+            lines += [f"- {n.need} — {n.why}" for n in open_needs]
+            lines.append("")
     for key, spec in schema.slots.items():
         if key == "business_outcome" or key in _SPECIAL_SLOTS:
             continue  # special slots get their own structured sections

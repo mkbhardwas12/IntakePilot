@@ -1,0 +1,187 @@
+# core/knowledge/processes.yaml — the analyst's domain knowledge.
+#
+# A seasoned business analyst does not read "vendor spend report" as a string;
+# they place it inside procure-to-pay, and that placement brings obligations
+# with it: the unstated needs they always check, the risks they have seen
+# sink this kind of work before, and the measures the business will judge it
+# by. This file is that placement knowledge, curated and versioned like code.
+#
+# Shape per process:
+#   signals          — phrases whose presence in the ask votes for this process
+#   stakeholders     — teams a BA would expect at the table
+#   unstated_needs   — what requesters reliably forget to say; `covered_by`
+#                      names the slot keys that, once filled, settle the need.
+#                      Needs with no covered_by stay open as a human reminder.
+#   risks            — the classic ways this kind of work goes wrong
+#   kpis             — how the business will actually measure success
+#
+# Orgs fork this file the way they fork the slot schemas. Matching is
+# deterministic (word-boundary phrase hits); no model decides the process.
+
+processes:
+  procure_to_pay:
+    label: Procure-to-Pay
+    signals: [vendor, vendors, supplier, suppliers, purchase order, purchase orders,
+              po, procurement, sourcing, goods receipt, vendor invoice, payment run,
+              accounts payable, spend, purchasing]
+    stakeholders: [Procurement, Accounts Payable]
+    unstated_needs:
+      - need: Refresh cadence
+        why: A spend report consumed monthly but refreshed ad hoc silently goes
+          stale; the cadence decides the whole build (extract vs live view).
+        covered_by: [refresh_frequency, urgency]
+      - need: Source of truth when systems disagree
+        why: Vendor totals from the ERP and the team's spreadsheets rarely
+          match; without a named authority every discrepancy becomes a dispute.
+        covered_by: [affected_systems]
+      - need: Confidentiality of commercial terms
+        why: Vendor pricing and payment terms are commercially sensitive;
+          who may see the output matters as much as what is in it.
+        covered_by: [data_sensitivity]
+      - need: Fiscal-calendar cut-off
+        why: Monthly spend means nothing until the cut-off is named —
+          calendar month, fiscal period, or posting date all give different totals.
+        covered_by: []
+    risks:
+      - risk: Duplicate vendor master records inflate or split spend totals
+        why: The same supplier under two vendor numbers is the single most
+          common reason a spend report fails reconciliation.
+      - risk: Open POs vs invoiced spend conflated
+        why: Committed and actual spend answer different questions; mixing
+          them produces numbers nobody can act on.
+    kpis: [spend under management, invoice cycle time, first-time match rate]
+
+  order_to_cash:
+    label: Order-to-Cash
+    signals: [customer order, customer orders, sales order, sales orders, billing,
+              customer invoice, shipment, delivery, deliveries, quotation, quote,
+              pricing, receivable, receivables, credit limit, order info, goods details,
+              product line]
+    stakeholders: [Sales Operations, Billing, Fulfillment]
+    unstated_needs:
+      - need: Which order status counts
+        why: Open, delivered, billed and returned orders give different rows;
+          "the orders" is ambiguous until a status filter is named.
+        covered_by: [scope_boundaries, data_fields]
+      - need: Refresh cadence
+        why: Order and delivery data changes hourly; whether the consumer needs
+          a snapshot or a live view changes the design entirely.
+        covered_by: [refresh_frequency, urgency]
+      - need: Customer data exposure
+        why: Order extracts carry customer names and terms; distribution
+          needs a decision before, not after, the first send.
+        covered_by: [data_sensitivity]
+    risks:
+      - risk: Pricing differs by sales organisation
+        why: The same material has different conditions per sales org and
+          date; an extract that ignores this shows prices no invoice matches.
+      - risk: Partial deliveries double-count quantities
+        why: One order line shipping in three deliveries appears three times
+          unless the join level is chosen deliberately.
+    kpis: [order cycle time, days sales outstanding, billing accuracy]
+
+  record_to_report:
+    label: Record-to-Report
+    signals: [month-end, month end, close, closing, reconciliation, journal,
+              journals, general ledger, gl, financial report, consolidation,
+              audit, fiscal, trial balance, period end]
+    stakeholders: [Financial Accounting, Controlling]
+    unstated_needs:
+      - need: Point-in-time correctness
+        why: Financial numbers move until the period is closed; a report run
+          mid-close and one run after tell different stories, and the audience
+          must know which one it is reading.
+        covered_by: [refresh_frequency]
+      - need: Audit traceability
+        why: Anything feeding a close or an audit must show where each number
+          came from; a convenient summary without lineage fails review.
+        covered_by: []
+      - need: Statutory vs management view
+        why: The same accounts roll up differently for statutory and internal
+          reporting; the ask rarely says which hierarchy it means.
+        covered_by: [scope_boundaries]
+    risks:
+      - risk: Prior-period adjustments shift published numbers
+        why: A report that recomputes history will disagree with what was
+          reported at the time — by design, but only if that design is chosen.
+    kpis: [days to close, reconciliation completion rate, adjustment count]
+
+  hire_to_retire:
+    label: Hire-to-Retire
+    signals: [employee, employees, onboarding, offboarding, payroll, hr, hiring,
+              new hire, leave, benefits, headcount, personnel]
+    stakeholders: [HR Operations, Payroll]
+    unstated_needs:
+      - need: Personal-data handling
+        why: Almost everything in this process is personal data; lawful basis
+          and access control are prerequisites, not enhancements.
+        covered_by: [data_sensitivity]
+      - need: Effective-dating
+        why: HR facts change with effect from a date, not at a moment; a
+          report without an as-of convention shows yesterday's org chart as
+          today's.
+        covered_by: []
+    risks:
+      - risk: Works-council / privacy constraints discovered late
+        why: Employee-level reporting often needs formal approval; finding
+          that out after the build is a restart, not a fix.
+    kpis: [time to productivity, payroll accuracy, onboarding cycle time]
+
+  plan_to_produce:
+    label: Plan-to-Produce
+    signals: [production, manufacturing, bom, bill of materials, work order,
+              work orders, capacity, mrp, materials planning, shop floor,
+              production order, plant]
+    stakeholders: [Production Planning, Plant Operations]
+    unstated_needs:
+      - need: Planning vs actuals distinction
+        why: Planned orders, released orders and confirmations answer
+          different questions; the ask must pick its layer.
+        covered_by: [scope_boundaries, data_fields]
+      - need: Refresh cadence matched to the planning cycle
+        why: A weekly MRP run consumed daily — or the reverse — makes the
+          numbers look wrong even when they are right.
+        covered_by: [refresh_frequency]
+    risks:
+      - risk: Unit-of-measure conversions distort quantities
+        why: Pieces, cartons and pallets coexist on the same material; sums
+          across them are meaningless without conversion.
+    kpis: [schedule adherence, throughput, inventory accuracy]
+
+  issue_to_resolution:
+    label: Issue-to-Resolution
+    signals: [incident, incidents, outage, defect, bug, broken, fails, failing,
+              error, errors, complaint, complaints, support ticket, not working,
+              crash, crashes]
+    stakeholders: [Application Support, Process Owner]
+    unstated_needs:
+      - need: Reproduction path and blast radius
+        why: An "it fails" needs who, where, since when, and for how many —
+          the difference between a hotfix and a change request.
+        covered_by: [current_behavior, scope_boundaries]
+      - need: Workaround status
+        why: Whether the team is blocked or limping decides urgency more
+          honestly than any stated deadline.
+        covered_by: [urgency]
+    risks:
+      - risk: Symptom fixed, cause left standing
+        why: Patching the visible failure without the underlying data or
+          config cause guarantees a repeat under a new ticket number.
+    kpis: [mean time to resolution, reopen rate, incident volume]
+
+# Applied when no process wins: the needs every requirement has regardless
+# of domain. label/signals unused for matching.
+general:
+  label: General
+  stakeholders: []
+  unstated_needs:
+    - need: An accountable owner on the business side
+      why: Requirements without a named owner stall at the first trade-off
+        question; someone must be able to decide.
+      covered_by: [stakeholders]
+    - need: How the result will be consumed
+      why: A dashboard, an email, and an API feed are three different builds
+        hiding behind the same sentence.
+      covered_by: [nfr, data_fields]
+  risks: []
+  kpis: []

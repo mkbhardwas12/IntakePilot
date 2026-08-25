@@ -79,6 +79,41 @@ class AuditEvent(BaseModel):
     detail: str = ""
 
 
+class ProcessMatch(BaseModel):
+    """Where the ask sits in the business — decided deterministically from
+    curated signals in core/knowledge/processes.yaml, never by a model."""
+    key: str
+    label: str
+    confidence: float
+    evidence: list[str] = []   # the signal phrases that voted
+
+
+class UnstatedNeed(BaseModel):
+    """Something requesters reliably forget to say. `covered` flips as slots
+    fill, so the checklist is live across the session."""
+    need: str
+    why: str
+    status: str = "open"           # open | covered
+    covered_by: str | None = None  # slot key that settled it, when covered
+
+
+class AnalystRisk(BaseModel):
+    risk: str
+    why: str
+
+
+class AnalystRead(BaseModel):
+    """The analyst's interpretation of the ask: process placement (curated
+    knowledge), a plain-language reading of the underlying need (LLM-composed,
+    deterministic fallback), and what a seasoned BA would still check."""
+    process: ProcessMatch | None = None
+    interpretation: str = ""
+    interpretation_source: str = "llm"   # llm | deterministic
+    unstated_needs: list[UnstatedNeed] = []
+    risks: list[AnalystRisk] = []
+    kpis: list[str] = []
+
+
 class RequirementObject(BaseModel):
     req_id: str                    # "IPR-{yyyy}-{seq:06d}"
     version: int = 1
@@ -96,6 +131,10 @@ class RequirementObject(BaseModel):
     # E: set by the deterministic request-type classifier on the first turn;
     # selects the slot-schema fork and the learning bucket.
     request_type: str = "default"
+
+    # The analyst's read of the ask — recomputed each interactive turn so the
+    # unstated-needs checklist tracks the live slots.
+    analyst: AnalystRead | None = None
 
     @property
     def context_bucket(self) -> str:

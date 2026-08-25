@@ -25,7 +25,7 @@ from core.config import Config, SlotSchema
 from core.models import (ExtractionError, Provenance, Question,
                          RequirementObject, Slot, Status, TurnResult,
                          coerce_edit)
-from core.agents import gap_analyzer, intake, precedent, question_composer
+from core.agents import analyst, gap_analyzer, intake, precedent, question_composer
 from core.agents import value as value_agent
 from core.learning import exemplars as learning
 
@@ -407,6 +407,19 @@ class Orchestrator:
                 await emit_decision(
                     key, "edited", "Human revised the Shadow Draft",
                     "mid_session_revision")
+
+        # 4.5 ANALYST READ — the BA interpretation of where this sits and what
+        # is still unsaid. Recomputed each interactive turn so the unstated-
+        # needs checklist tracks the live slots; advisory by construction
+        # (nothing here feeds slots, routing, gates, or the budget), and a
+        # failure never costs the turn.
+        if interactive and obj.ask_verbatim:
+            await send("status", {"stage": "interpreting"})
+            try:
+                obj.analyst = await analyst.read(self.llm, obj, schema)
+                await send("analyst", obj.analyst.model_dump(mode="json"))
+            except Exception as exc:  # noqa: BLE001 — advisory, never blocking
+                obj.touch("analyst_read_failed", str(exc)[:200])
 
         # 5. READINESS + RENDER + PERSIST (append version, stream deltas)
         await send("status", {"stage": "scoring"})

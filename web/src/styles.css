@@ -2545,3 +2545,146 @@ input {
   margin-top: 8px;
   color: var(--text-dim);
 }
+
+/* ---------- analyst read ---------- */
+
+.analyst-card {
+  border-top: 1px solid var(--border);
+  padding: 13px 18px 15px;
+  font-size: 12.5px;
+  flex: none;
+  max-height: 32%;
+  overflow-y: auto;
+}
+
+.analyst-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.analyst-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.analyst-process {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 999px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  white-space: nowrap;
+}
+
+.analyst-interpretation {
+  margin: 0 0 9px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.analyst-det-tag {
+  color: var(--text-faint);
+  font-size: 11.5px;
+}
+
+.analyst-subhead {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 5px;
+}
+
+.analyst-count {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.analyst-needs ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.analyst-need {
+  display: flex;
+  gap: 7px;
+  align-items: baseline;
+  color: var(--text-dim);
+}
+
+.analyst-need.covered {
+  color: var(--text-faint);
+}
+
+.need-mark {
+  flex: none;
+  font-size: 11px;
+}
+
+.analyst-need.covered .need-mark {
+  color: var(--ok);
+}
+
+.analyst-need.open .need-mark {
+  color: var(--warn);
+}
+
+.need-covered-by {
+  color: var(--text-faint);
+  font-size: 11.5px;
+}
+
+.analyst-toggle {
+  margin-top: 8px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.analyst-extra {
+  margin-top: 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.analyst-risk {
+  display: flex;
+  gap: 7px;
+  align-items: baseline;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+
+.risk-mark {
+  flex: none;
+  font-weight: 700;
+  color: var(--warn);
+}
+
+.risk-why {
+  color: var(--text-faint);
+}
+
+.analyst-kpis {
+  color: var(--text-faint);
+  font-size: 12px;
+  margin-top: 2px;
+}

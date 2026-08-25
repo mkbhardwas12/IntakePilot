@@ -141,6 +141,19 @@ class MockLLM:
             data = _compose_questions(full)
         elif task.startswith("gate"):
             data = {"passed": True, "reason": None, "suggestion": None}
+        elif task == "analyst":
+            ask_m = re.search(r"Ask:\s*(.+)", full)
+            proc_m = re.search(r"Process:\s*(.+)", full)
+            ask = (ask_m.group(1).strip().rstrip(".") if ask_m else "the request")
+            proc = proc_m.group(1).strip() if proc_m else "unplaced"
+            if proc != "unplaced":
+                text = (f"At its core this is a {proc} need: {ask}. The outcome "
+                        "that matters to the business is a dependable, repeatable "
+                        "result that removes the manual effort behind the ask.")
+            else:
+                text = (f"At its core the requester needs: {ask}. The outcome "
+                        "that matters is a dependable, repeatable result.")
+            data = {"interpretation": text}
         elif task == "acceptance":
             ask_m = re.search(r"Ask:\s*(.+)", full)
             crit_m = re.search(r'"success_criteria":\s*"([^"]+)"', full)

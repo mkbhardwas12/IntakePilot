@@ -70,7 +70,12 @@ flowchart LR
 2. **Draft** — the Shadow Draft builds live over SSE: extracted slots with
    provenance badges and confidence bars. Gaps are resolved by inference
    and precedent *before* asking anything; at most 3 questions per turn,
-   7 total — enforced in code, not in a prompt.
+   7 total — enforced in code, not in a prompt. Alongside the draft, the
+   **Analyst read** interprets the ask the way a seasoned BA would: it
+   places the requirement in its business process (procure-to-pay,
+   order-to-cash, record-to-report, …) from curated signals — never a
+   model's guess — and keeps a live checklist of what requesters usually
+   leave unsaid, flipping items to covered as answers land.
 3. **Confirm** — the requester reviews the shakiest fields first, revises
    any field inline (every correction is captured as a learning signal),
    and confirms. Nothing routes without a human confirmation.
@@ -344,6 +349,16 @@ Implemented and verified (spec milestones 1–5 core, plus gates/routing from 6)
   corrections surface as glossary proposals (`GET /api/glossary/proposals`,
   human-accepted via `POST /api/glossary`); system-KB validation via
   `POST /api/kb/{system}/{entity}/validate`
+- The Analyst read (`core/agents/analyst.py` + `core/knowledge/processes.yaml`):
+  every interactive turn, the ask is placed in an end-to-end business process
+  by deterministic signal matching against a curated, forkable taxonomy —
+  which brings a BA's obligations with it: unstated needs (statused live
+  against the slots that would settle them), classic risks, and the KPIs the
+  business will judge the work by. The plain-language interpretation is the
+  one LLM-composed part (validated, deterministic fallback); it is advisory
+  by construction — nothing in it feeds slots, routing, gates, or the budget.
+  Streamed as an `analyst` SSE event, shown in the draft column, included in
+  the confirm render
 - Attachment validation (`core/attachments/` +
   `POST /api/sessions/{id}/attachments`, paperclip in the intake chat): a
   streaming, stdlib-only `.xlsx` reader (no size/row/cell-length caps,
@@ -390,7 +405,8 @@ Spec'd for later (honest gaps):
 ## Repo layout
 
 Matches spec Section 3: `core/` (api, agents+prompts, attachments, gates,
-learning {exemplars, proposals, replay}, providers/{llm,store,vector,connector},
+knowledge, learning {exemplars, proposals, replay},
+providers/{llm,store,vector,connector},
 targets, schemas, models.py, config.py), `web/`, `deploy/` (docker-compose +
 Dockerfiles + nginx), `scripts/` (ops_check.py live-API readiness sweep),
 `tests/` (invariants, e2e, golden set, per-feature suites), `evals/golden/`,

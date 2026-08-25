@@ -18,6 +18,7 @@ const STAGE_LABELS: Record<TurnStage, string> = {
   extracting: "Extracting slots…",
   resolving_gaps: "Resolving gaps…",
   composing_questions: "Composing questions…",
+  interpreting: "Analyst reading the ask…",
   scoring: "Scoring readiness…"
 };
 
