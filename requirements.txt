@@ -5,3 +5,4 @@ pydantic==2.13.4
 PyYAML==6.0.3
 httpx==0.28.1
 # Optional (Postgres/pgvector path): pip install asyncpg>=0.30
+# Optional (MANAS outbox export, default-off): pip install jsonschema>=4.23

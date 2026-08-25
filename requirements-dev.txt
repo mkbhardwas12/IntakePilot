@@ -1,3 +1,5 @@
 -r requirements.txt
 pytest==9.1.1
 pytest-asyncio==1.4.0
+# The MANAS outbox emitter validates payloads against the vendored pack's schemas.
+jsonschema==4.26.0

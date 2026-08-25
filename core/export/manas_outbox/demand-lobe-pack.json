@@ -1,0 +1,272 @@
+{
+  "digest": "sha256:cbb352fcc234d328061a60b666fc7d8f47c515e114772c4b9c82efc6cc858c91",
+  "event_types": [
+    "io.manas.demand.outcome.adjudicated.v1",
+    "io.manas.demand.requirement.versioned.v2"
+  ],
+  "format": "manas-contract-pack/1",
+  "lobes": {
+    "io.manas.demand.outcome.adjudicated.v1": "demand",
+    "io.manas.demand.requirement.versioned.v2": "demand"
+  },
+  "pack_version": "1.0.0",
+  "schema_uris": {
+    "io.manas.demand.outcome.adjudicated.v1": "urn:manas:schema:io.manas.demand.outcome.adjudicated.v1:1.0.0",
+    "io.manas.demand.requirement.versioned.v2": "urn:manas:schema:io.manas.demand.requirement.versioned.v2:1.0.0"
+  },
+  "schemas": {
+    "io.manas.demand.outcome.adjudicated.v1": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "adjudicated_at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+          "type": "string"
+        },
+        "adjudicated_by_role": {
+          "enum": [
+            "business_owner",
+            "product_owner"
+          ],
+          "type": "string"
+        },
+        "adjudication_method": {
+          "const": "human",
+          "type": "string"
+        },
+        "adjudication_policy": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/+-]{0,127}$",
+          "type": "string"
+        },
+        "adjudication_receipt_commitment": {
+          "pattern": "^hmac-sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "change_ref": {
+          "maxLength": 256,
+          "pattern": "^change:[A-Za-z0-9][A-Za-z0-9._-]{0,95}:[A-Za-z0-9][A-Za-z0-9._-]{0,95}$",
+          "type": "string"
+        },
+        "change_source_binding": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "deployment_ref": {
+          "maxLength": 256,
+          "pattern": "^deployment:[A-Za-z0-9][A-Za-z0-9._-]{0,95}:[A-Z][A-Z0-9]{2}:[0-9]{3}:[A-Za-z0-9][A-Za-z0-9._-]{0,95}$",
+          "type": "string"
+        },
+        "deployment_source_binding": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "outcome_evidence_hash": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "outcome_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$",
+          "type": "string"
+        },
+        "outcome_ref": {
+          "maxLength": 256,
+          "pattern": "^outcome:[A-Za-z0-9][A-Za-z0-9._-]{0,95}:[A-Za-z0-9][A-Za-z0-9._-]{0,95}$",
+          "type": "string"
+        },
+        "requirement_ref": {
+          "maxLength": 256,
+          "pattern": "^req:[A-Za-z0-9][A-Za-z0-9._-]{0,95}:[A-Za-z0-9][A-Za-z0-9._-]{0,95}@v[1-9][0-9]{0,9}$",
+          "type": "string"
+        },
+        "requirement_source_binding": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "source_binding": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "source_instance_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$",
+          "type": "string"
+        },
+        "source_kind": {
+          "const": "adjudicated_outcome",
+          "type": "string"
+        },
+        "verdict": {
+          "enum": [
+            "achieved",
+            "partially_achieved",
+            "not_achieved"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "outcome_ref",
+        "outcome_id",
+        "source_instance_id",
+        "source_binding",
+        "source_kind",
+        "deployment_ref",
+        "deployment_source_binding",
+        "requirement_ref",
+        "requirement_source_binding",
+        "change_ref",
+        "change_source_binding",
+        "verdict",
+        "adjudication_method",
+        "adjudicated_by_role",
+        "outcome_evidence_hash",
+        "adjudication_receipt_commitment",
+        "adjudication_policy",
+        "adjudicated_at"
+      ],
+      "type": "object"
+    },
+    "io.manas.demand.requirement.versioned.v2": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "acceptance_criteria_commitment": {
+          "pattern": "^hmac-sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "change_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$",
+          "type": "string"
+        },
+        "change_ref": {
+          "maxLength": 256,
+          "pattern": "^change:[A-Za-z0-9][A-Za-z0-9._-]{0,95}:[A-Za-z0-9][A-Za-z0-9._-]{0,95}$",
+          "type": "string"
+        },
+        "commitment_policy": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/+-]{0,127}$",
+          "type": "string"
+        },
+        "intent_commitment": {
+          "pattern": "^hmac-sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "registered_at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+          "type": "string"
+        },
+        "request_type": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "type": "string"
+        },
+        "requirement_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$",
+          "type": "string"
+        },
+        "requirement_ref": {
+          "maxLength": 256,
+          "pattern": "^req:[A-Za-z0-9][A-Za-z0-9._-]{0,95}:[A-Za-z0-9][A-Za-z0-9._-]{0,95}@v[1-9][0-9]{0,9}$",
+          "type": "string"
+        },
+        "requirement_version": {
+          "maximum": 9999999999,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "source_binding": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "source_instance_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$",
+          "type": "string"
+        },
+        "source_kind": {
+          "const": "requirement_version",
+          "type": "string"
+        },
+        "source_schema_name": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/+-]{0,127}$",
+          "type": "string"
+        },
+        "source_schema_version": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/+-]{0,127}$",
+          "type": "string"
+        },
+        "status": {
+          "const": "ready_for_build",
+          "type": "string"
+        }
+      },
+      "required": [
+        "requirement_ref",
+        "requirement_id",
+        "requirement_version",
+        "source_instance_id",
+        "source_binding",
+        "source_kind",
+        "change_ref",
+        "change_id",
+        "status",
+        "request_type",
+        "intent_commitment",
+        "acceptance_criteria_commitment",
+        "commitment_policy",
+        "source_schema_name",
+        "source_schema_version",
+        "registered_at"
+      ],
+      "type": "object"
+    }
+  },
+  "wire": {
+    "io.manas.demand.outcome.adjudicated.v1": {
+      "activity": "adjudicate.outcome",
+      "agent": "svc:demand/intakepilot@manas-export-v2",
+      "dataclassification": "internal",
+      "derived_fields": [
+        "deployment_ref",
+        "requirement_ref",
+        "change_ref"
+      ],
+      "partition_field": "change_ref",
+      "ref_fields": [
+        "outcome_ref",
+        "deployment_ref",
+        "requirement_ref",
+        "change_ref"
+      ],
+      "schemaversion": "1.0.0",
+      "scrubpolicy": "scrub/2026.08",
+      "source": "//manas/demand/intakepilot",
+      "subject_field": "outcome_ref",
+      "time_field": "adjudicated_at",
+      "used_fields": [
+        "source_binding",
+        "deployment_source_binding",
+        "requirement_source_binding",
+        "change_source_binding",
+        "adjudication_receipt_commitment"
+      ]
+    },
+    "io.manas.demand.requirement.versioned.v2": {
+      "activity": "export.outbox",
+      "agent": "svc:demand/intakepilot@manas-export-v2",
+      "dataclassification": "internal",
+      "derived_fields": [],
+      "partition_field": "change_ref",
+      "ref_fields": [
+        "requirement_ref",
+        "change_ref"
+      ],
+      "schemaversion": "1.0.0",
+      "scrubpolicy": "scrub/2026.08",
+      "source": "//manas/demand/intakepilot",
+      "subject_field": "requirement_ref",
+      "time_field": "registered_at",
+      "used_fields": [
+        "source_binding"
+      ]
+    }
+  },
+  "wire_digest": "sha256:dcb93aad10011342bf24bc878814f84352b3f814141a33b4aa909f589dd93fab"
+}
