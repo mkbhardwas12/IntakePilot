@@ -6,6 +6,15 @@ on:
   pull_request:
 
 jobs:
+  attribution:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reject AI-agent contributor attribution
+        run: python3 scripts/check_agent_attribution.py HEAD
+
   backend:
     runs-on: ubuntu-latest
     strategy:
