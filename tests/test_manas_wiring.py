@@ -191,3 +191,110 @@ def test_change_id_sanitises_to_the_pack_pattern():
     assert service.change_id_from("PROJ-123", "IPR-1") == "PROJ-123"
     assert service.change_id_from("a/b c#d", "IPR-1") == "a-b-c-d"
     assert service.change_id_from(None, "IPR-2026-000001") == "IPR-2026-000001"
+
+
+# ------------------------------------------------------------------ atomicity
+
+async def test_version_and_outbox_row_commit_or_fail_together(client, monkeypatch):
+    _, ctx = client
+    set_env(monkeypatch)
+    from tests.conftest import make_obj
+    obj = make_obj(req_id="IPR-2026-000777", ask="vendor spend x")
+    row = service.build_requirement_versioned_row(obj, acceptance_text="done when fast")
+    assert row is not None and row["state"] == "pending"
+    await ctx.store.put_version_with_outbox(obj, row)
+    assert (await ctx.store.latest(obj.req_id)).version == obj.version
+    assert len(await ctx.store.query_ledger("manas_outbox", req_id=obj.req_id)) == 1
+
+    # Same version again: the whole transaction rolls back — no orphan event.
+    from core.providers.store.base import AppendOnlyViolation
+    with pytest.raises(AppendOnlyViolation):
+        await ctx.store.put_version_with_outbox(obj, dict(row))
+    assert len(await ctx.store.query_ledger("manas_outbox", req_id=obj.req_id)) == 1
+
+
+# ------------------------------------------------------------------ the relay
+
+from core.export.manas_outbox import relay
+
+
+def relay_transport(responses: list):
+    """Each call pops the next (status, body). Also records requests."""
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        status, body = responses.pop(0)
+        return httpx.Response(status, text=body)
+
+    return httpx.MockTransport(handler), seen
+
+
+async def test_relay_ships_pending_and_stores_the_receipt(client, monkeypatch):
+    client, ctx = client
+    set_env(monkeypatch)
+    _, req_id = await drive_to_routed(client)
+    transport, seen = relay_transport([(202, '{"event_id":"e1","ingested_at":"t"}')])
+
+    report = await relay.ship_pending(ctx.store, url="https://manas.example/ingest",
+                                      token="tok", transport=transport)
+    assert report["shipped"] == 1 and report["dead_lettered"] == 0
+    assert seen[0].headers["authorization"] == "Bearer tok"
+    assert seen[0].headers["content-type"] == "application/cloudevents+json"
+
+    rows = await ctx.store.query_ledger("manas_outbox", req_id=req_id)
+    states = {r["state"]: r for r in rows}
+    assert "shipped" in states
+    assert "event_id" in states["shipped"]["reason"]      # the MANAS receipt
+    # Shipped rows do not ship twice.
+    transport2, seen2 = relay_transport([])
+    report = await relay.ship_pending(ctx.store, url="https://x", token="t",
+                                      transport=transport2)
+    assert report["shipped"] == 0 and not seen2
+
+
+async def test_relay_dead_letters_contract_rejections_immediately(client, monkeypatch):
+    client, ctx = client
+    set_env(monkeypatch)
+    _, req_id = await drive_to_routed(client)
+    transport, _ = relay_transport([(422, "schema mismatch")])
+    report = await relay.ship_pending(ctx.store, url="https://x", token="t",
+                                      transport=transport)
+    assert report["dead_lettered"] == 1
+    rows = await ctx.store.query_ledger("manas_outbox", req_id=req_id)
+    assert any(r["state"] == "dead_letter" and "schema mismatch" in r["reason"]
+               for r in rows)
+
+
+async def test_relay_retries_transient_failures_then_dead_letters(client, monkeypatch):
+    client, ctx = client
+    set_env(monkeypatch)
+    _, req_id = await drive_to_routed(client)
+
+    transport, _ = relay_transport([(503, "down")])
+    report = await relay.ship_pending(ctx.store, url="https://x", token="t",
+                                      transport=transport, max_attempts=2)
+    assert report["failed"] == 1     # attempt_failed, still pending next pass
+
+    transport, _ = relay_transport([(503, "still down")])
+    report = await relay.ship_pending(ctx.store, url="https://x", token="t",
+                                      transport=transport, max_attempts=2)
+    assert report["dead_lettered"] == 1   # attempt budget spent
+
+    states = [r["state"] for r in await ctx.store.query_ledger(
+        "manas_outbox", req_id=req_id)]
+    assert "attempt_failed" in states and "dead_letter" in states
+
+
+async def test_relay_without_config_reports_not_ships(client):
+    _, ctx = client
+    report = await relay.ship_pending(ctx.store)
+    assert "not configured" in report["error"]
+
+
+async def test_ship_endpoint_triggers_a_pass(client, monkeypatch):
+    client, ctx = client
+    set_env(monkeypatch)
+    resp = await client.post("/api/export/outbox/ship")
+    assert resp.status_code == 200
+    assert "not configured" in resp.json()["error"]

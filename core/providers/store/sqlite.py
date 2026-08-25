@@ -105,6 +105,37 @@ class SqliteStore:
                         f"{obj.req_id} v{obj.version} already exists") from exc
         await asyncio.to_thread(_)
 
+    async def put_version_with_outbox(self, obj: RequirementObject,
+                                      outbox_row: dict) -> None:
+        """The transactional outbox, honestly transactional: the requirement
+        version and its MANAS outbox row commit or roll back together, so a
+        crash can never leave a routed version with no event (or an event
+        for a version that never landed)."""
+        def _():
+            data = dict(outbox_row)
+            data.setdefault("created_at", datetime.now(timezone.utc).isoformat())
+            cols = [c for c in LEDGER_TABLES["manas_outbox"] if c in data]
+            vals = [data[c] for c in cols]
+            with self._lock:
+                try:
+                    self._conn.execute(
+                        "INSERT INTO requirements (req_id, version, obj, created_at) "
+                        "VALUES (?,?,?,?)",
+                        (obj.req_id, obj.version, obj.model_dump_json(),
+                         datetime.now(timezone.utc).isoformat()))
+                    self._conn.execute(
+                        f"INSERT INTO manas_outbox ({','.join(cols)}) "
+                        f"VALUES ({','.join('?' * len(cols))})", vals)
+                    self._conn.commit()
+                except sqlite3.IntegrityError as exc:
+                    self._conn.rollback()
+                    raise AppendOnlyViolation(
+                        f"{obj.req_id} v{obj.version} already exists") from exc
+                except Exception:
+                    self._conn.rollback()
+                    raise
+        await asyncio.to_thread(_)
+
     async def latest(self, req_id: str) -> RequirementObject:
         def _():
             row = self._conn.execute(

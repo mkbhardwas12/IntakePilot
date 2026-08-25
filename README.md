@@ -18,20 +18,23 @@ for an honest review of the spec and the choices made where it was silent.
 
 ## Quick look
 
-One intake, end to end — real UI, offline mock model, ~24 seconds.
-**New: attachment check** — attach a spreadsheet mid-intake and it is
-validated instantly: verdict, findings with the exact cell to fix, and
-coverage of the fields the requirement asked for. Also: X-ray Intake —
-watch the gap ladder decide *infer / retrieve / ask* live, then share a
-cinematic replay (`/r/{token}`) with an OG card.
+One intake, end to end — real UI, offline mock model, ~30 seconds.
+**New: the Analyst read** — the ask is placed in its business process
+(Order-to-Cash here), interpreted in plain language, and the analyst's
+usually-left-unsaid checklist steers the interview: watch the X-ray show
+questions asked *because the analyst flagged them*. Also: instant
+spreadsheet checking on attach, and X-ray Intake with shareable cinematic
+replays (`/r/{token}`).
 
 ![IntakePilot demo: plain-language ask to routed ticket](docs/assets/demo.gif)
 
-*A plain-language ask becomes a live Shadow Draft with provenance badges and
-an X-ray Decision Rail; two batched questions; an attached spreadsheet is
-checked on the spot (title row above headers, numbers stored as text — each
-with the cell ref to fix); confirm; five gates; routed ticket. Hit
-**Play the 23-second demo**, then **Share this intake**.
+*A plain-language ask becomes a live Shadow Draft with provenance badges,
+an Analyst read (process badge, interpretation, open/covered checklist,
+risks & measures), and an X-ray Decision Rail; analyst-flagged questions;
+an attached spreadsheet is checked on the spot (title row above headers,
+numbers stored as text — each with the cell ref to fix); confirm; five
+gates; routed ticket. Hit **Play the 23-second demo**, then
+**Share this intake**.
 Launch notes: [docs/LAUNCH.md](docs/LAUNCH.md). Higher-quality video:
 [docs/assets/demo.mp4](docs/assets/demo.mp4).*
 
@@ -362,7 +365,12 @@ Implemented and verified (spec milestones 1–5 core, plus gates/routing from 6)
   logs what the analyst believed, recurring vocabulary the taxonomy is
   missing surfaces as proposals (`GET /api/analyst/proposals`), and a human
   accept (`POST /api/analyst/signals`) makes the term a recognition signal —
-  mined from data, human-approved, never auto-applied
+  mined from data, human-approved, never auto-applied. The checklist is
+  predictive, not just curated: needs that stayed open in requirements later
+  adjudicated as missing the mark carry a "missed ×N" evidence badge and
+  sort first. And open needs actively steer the interview — a need whose
+  covering slot is askable and empty competes for question slots
+  (deterministically, always after required gaps, never widening the budget)
 - MANAS demand-lobe outbox, wired (default-off, `MANAS_OUTBOX_ENABLED=true`
   plus the `MANAS_*` binding and tenant pepper): confirming a routed
   requirement commits an `io.manas.demand.requirement.versioned.v2` envelope
@@ -372,7 +380,16 @@ Implemented and verified (spec milestones 1–5 core, plus gates/routing from 6)
   verdict achieved/partially_achieved/not_achieved by a business or product
   owner) records the terminal judgement locally and, when the delivery
   system's deployment attestation is presented, emits
-  `outcome.adjudicated.v1`. A relay reads and acknowledges via
+  `outcome.adjudicated.v1`. The outbox is honestly transactional: the
+  requirement version and its envelope commit in one SQL transaction
+  (`put_version_with_outbox`, both stores), so a crash can never separate
+  the version from its event. The relay ships it the last mile —
+  `python -m core.export.manas_outbox.relay` (cron) or
+  `POST /api/export/outbox/ship`, authenticated via `MANAS_RELAY_URL` +
+  `MANAS_RELAY_TOKEN`: 2xx stores the MANAS receipt verbatim, 4xx
+  dead-letters immediately (contract rejections don't retry), 5xx/transport
+  errors retry across passes until the attempt budget dead-letters them;
+  every attempt is an append-only row. Manual read/ack stays available via
   `GET/POST /api/export/outbox`; misconfiguration becomes an auditable
   rejected row, never a failed confirm
 - Attachment validation (`core/attachments/` +

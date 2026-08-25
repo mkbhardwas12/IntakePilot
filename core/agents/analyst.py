@@ -84,11 +84,16 @@ def _filled(obj: RequirementObject, key: str) -> bool:
     return slot is not None and slot.value not in (None, "", [])
 
 
-def _needs(entry: dict, obj: RequirementObject,
-           schema: SlotSchema) -> list[UnstatedNeed]:
+def _needs(entry: dict, obj: RequirementObject, schema: SlotSchema,
+           outcome_stats: Mapping[str, int] | None = None) -> list[UnstatedNeed]:
     """The checklist, statused against the live draft. A need whose covering
     slot is not even in this request type's schema is dropped rather than
-    left permanently open — the fork said it does not apply here."""
+    left permanently open — the fork said it does not apply here.
+
+    ``outcome_stats`` carries adjudication evidence: needs that were open at
+    confirm in requirements later judged to have missed the mark. Open needs
+    with evidence sort first — the checklist becomes predictive, not just
+    curated."""
     out: list[UnstatedNeed] = []
     for raw in entry.get("unstated_needs", []):
         keys = raw.get("covered_by") or []
@@ -99,8 +104,25 @@ def _needs(entry: dict, obj: RequirementObject,
         out.append(UnstatedNeed(
             need=raw["need"], why=raw["why"],
             status="covered" if covering else "open",
-            covered_by=covering))
+            covered_by=covering,
+            candidate_slots=in_schema,
+            evidence_count=(outcome_stats or {}).get(raw["need"], 0)))
+    out.sort(key=lambda n: (n.status == "covered", -n.evidence_count))
     return out
+
+
+def refresh_needs(read: AnalystRead, obj: RequirementObject,
+                  schema: SlotSchema) -> None:
+    """Re-status the checklist against the current slots without a model
+    call — used after answers/defaults land later in the same turn."""
+    for need in read.unstated_needs:
+        covering = next((k for k in need.candidate_slots if _filled(obj, k)),
+                        None)
+        if need.candidate_slots:
+            need.status = "covered" if covering else "open"
+            need.covered_by = covering
+    read.unstated_needs.sort(
+        key=lambda n: (n.status == "covered", -n.evidence_count))
 
 
 def _fallback_interpretation(obj: RequirementObject,
@@ -144,13 +166,15 @@ async def read(llm, obj: RequirementObject, schema: SlotSchema,
     if outcome and outcome.value:
         corpus += " " + str(outcome.value)
     learned = None
+    outcome_stats = None
     if store is not None:
         from core.learning import analyst_signals
         learned = await analyst_signals.learned_signals(store)
+        outcome_stats = await analyst_signals.need_outcome_stats(store)
     match = classify_process(corpus, learned)
     entry = know["processes"][match.key] if match else know["general"]
 
-    needs = _needs(entry, obj, schema)
+    needs = _needs(entry, obj, schema, outcome_stats)
     risks = [AnalystRisk(**r) for r in entry.get("risks", [])]
     kpis = list(entry.get("kpis", []))
 

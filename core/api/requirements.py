@@ -153,26 +153,22 @@ async def adjudicate(req_id: str, body: AdjudicateBody, request: Request):
                   f"{body.verdict} by {body.adjudicated_by_role}")
         if body.verdict == "achieved":
             obj.status = Status.DONE
-        await ctx.store.put_version(obj)
+        # Adjudicated version + outcome envelope in one transaction.
+        outbox = manas_service.build_outcome_adjudicated_row(
+            obj, verdict=body.verdict, role=body.adjudicated_by_role,
+            receipt_text=body.receipt, evidence_text=body.evidence or "",
+            deployment_ref=body.deployment_ref,
+            deployment_source_binding=body.deployment_source_binding)
+        if outbox is not None:
+            await ctx.store.put_version_with_outbox(obj, outbox)
+        else:
+            await ctx.store.put_version(obj)
 
     await ctx.store.log("outcome_ledger", {
         "req_id": req_id, "stage": "adjudicated", "verdict": body.verdict,
         "detail": {"role": body.adjudicated_by_role,
                    "receipt": body.receipt,
                    "bucket": obj.context_bucket}})
-
-    # change_ref continuity: reuse the routed ticket handle, never reconstruct.
-    ticket_ref = None
-    for row in await ctx.store.query_ledger("outcome_ledger", req_id=req_id,
-                                            stage="routed"):
-        ticket = (row.get("detail") or {}).get("ticket") or {}
-        ticket_ref = ticket.get("ref") or ticket_ref
-    outbox = await manas_service.record_outcome_adjudicated(
-        ctx.store, obj, verdict=body.verdict, role=body.adjudicated_by_role,
-        receipt_text=body.receipt, evidence_text=body.evidence or "",
-        deployment_ref=body.deployment_ref,
-        deployment_source_binding=body.deployment_source_binding,
-        change_id=manas_service.change_id_from(ticket_ref, req_id))
 
     return {"req_id": req_id, "verdict": body.verdict,
             "status": obj.status.value,
@@ -404,8 +400,22 @@ async def _confirm_locked(ctx, req_id: str, body: ConfirmBody):
             f"gate{g.gate}: {g.reason}" for g in gates if not g.passed))
 
     # Persist the routed/gated version BEFORE external ticket create so a
-    # target failure cannot leave an orphan ticket with no store row.
-    await ctx.store.put_version(obj)
+    # target failure cannot leave an orphan ticket with no store row. For a
+    # routed version with the MANAS outbox enabled, the requirement.versioned
+    # envelope commits in the SAME transaction — a crash can never separate
+    # the version from its event.
+    outbox_row = None
+    if obj.status == Status.ROUTED:
+        acceptance_text = acceptance.section(acceptance_scenarios)
+        if not acceptance_text:
+            sc = obj.slots.get("success_criteria")
+            acceptance_text = str(sc.value) if sc and sc.value else ""
+        outbox_row = manas_service.build_requirement_versioned_row(
+            obj, acceptance_text=acceptance_text)
+    if outbox_row is not None:
+        await ctx.store.put_version_with_outbox(obj, outbox_row)
+    else:
+        await ctx.store.put_version(obj)
 
     if obj.status == Status.ROUTED and ticket_title is not None:
         try:
@@ -434,19 +444,6 @@ async def _confirm_locked(ctx, req_id: str, body: ConfirmBody):
                 "confidence": obj.analyst.process.confidence if obj.analyst.process else 0,
                 "open_needs": [n.need for n in obj.analyst.unstated_needs
                                if n.status == "open"]}})
-
-    # MANAS demand-lobe outbox (default-off): the exact version that went to
-    # build, committed alongside the domain write. An external relay ships
-    # pending rows; a rejection is an auditable row, never a failed confirm.
-    if obj.status == Status.ROUTED:
-        acceptance_text = acceptance.section(acceptance_scenarios)
-        if not acceptance_text:
-            sc = obj.slots.get("success_criteria")
-            acceptance_text = str(sc.value) if sc and sc.value else ""
-        await manas_service.record_requirement_versioned(
-            ctx.store, obj,
-            ticket_ref=ticket.ref if ticket else None,
-            acceptance_text=acceptance_text)
 
     return {"draft": obj.model_dump(mode="json"),
             "gates": [g.model_dump() for g in gates],

@@ -58,6 +58,24 @@ async def learned_signals(store) -> dict[str, list[str]]:
     return await _accepted(store)
 
 
+async def need_outcome_stats(store) -> dict[str, int]:
+    """need name -> requirements where it was still open at confirm AND the
+    delivered result was later adjudicated as not (or only partially)
+    achieved. This is the checklist learning from real outcomes: a need that
+    keeps preceding a missed mark is not a nicety, it is a predictor."""
+    missed: set[str] = set()
+    for row in await store.query_ledger("outcome_ledger", stage="adjudicated"):
+        if row.get("verdict") in ("not_achieved", "partially_achieved"):
+            missed.add(row.get("req_id"))
+    counts: Counter = Counter()
+    for row in await store.query_ledger("outcome_ledger", stage="analyst"):
+        if row.get("req_id") not in missed:
+            continue
+        for need in (row.get("detail") or {}).get("open_needs", []):
+            counts[need] += 1
+    return dict(counts)
+
+
 async def signal_proposals(store,
                            min_occurrences: int = PROPOSAL_MIN_OCCURRENCES) -> list[dict]:
     """Mine the confirm-time analyst ledger for missing vocabulary."""

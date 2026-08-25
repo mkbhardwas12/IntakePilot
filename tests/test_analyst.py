@@ -231,3 +231,67 @@ async def test_proposals_exclude_already_accepted_signals(store):
         "process": "procure_to_pay", "signal": "freight", "accepted_by": "t"})
     proposals = await analyst_signals.signal_proposals(store)
     assert not any(p["signal"] == "freight" for p in proposals)
+
+
+# ------------------------------------------------------------------ outcomes make the checklist predictive
+
+async def test_needs_open_before_missed_outcomes_gain_evidence(llm, store, schema):
+    await store.log("outcome_ledger", {
+        "req_id": "IPR-A", "stage": "analyst", "verdict": "procure_to_pay",
+        "detail": {"ask": "x", "open_needs": ["Fiscal-calendar cut-off"]}})
+    await store.log("outcome_ledger", {
+        "req_id": "IPR-A", "stage": "adjudicated", "verdict": "not_achieved",
+        "detail": {}})
+    # An achieved requirement contributes no evidence.
+    await store.log("outcome_ledger", {
+        "req_id": "IPR-B", "stage": "analyst", "verdict": "procure_to_pay",
+        "detail": {"ask": "y", "open_needs": ["Refresh cadence"]}})
+    await store.log("outcome_ledger", {
+        "req_id": "IPR-B", "stage": "adjudicated", "verdict": "achieved",
+        "detail": {}})
+
+    obj = make_obj(ask="our monthly vendor spend report takes 3 days to compile by hand")
+    read = await analyst.read(llm, obj, schema, store=store)
+    by_name = {n.need: n for n in read.unstated_needs}
+    assert by_name["Fiscal-calendar cut-off"].evidence_count == 1
+    assert by_name["Refresh cadence"].evidence_count == 0
+    # Evidence-bearing open needs sort first.
+    open_needs = [n for n in read.unstated_needs if n.status == "open"]
+    assert open_needs[0].need == "Fiscal-calendar cut-off"
+
+
+# ------------------------------------------------------------------ needs become question candidates
+
+async def test_open_needs_compete_for_question_slots(orchestrator, store):
+    obj = make_obj(ask="")
+    obj.ask_verbatim = ("our monthly vendor spend report takes 3 days to "
+                        "compile by hand")
+    obj.request_type = "data_request"
+    await store.put_version(obj)
+    session = {"session_id": "s-needs", "req_id": obj.req_id, "turns": [],
+               "pending_questions": []}
+    await store.put_session(session)
+
+    result = await orchestrator.handle_turn(session, obj.ask_verbatim)
+    by_slot = {q.slot_key: q for q in result.questions}
+    # refresh_frequency is optional (never a required gap) — it is asked
+    # only because the analyst's 'Refresh cadence' need is open and the
+    # slot schema says it is askable.
+    assert "refresh_frequency" in by_slot
+    assert "analyst flags" in by_slot["refresh_frequency"].because
+    # The budget is untouched as a limit: never more than per-turn.
+    assert len(result.questions) <= result.draft.question_budget.per_turn
+
+
+async def test_analyst_questions_still_respect_the_budget(orchestrator, store):
+    from core.models import Budget
+    obj = make_obj(ask="", budget=Budget(max=0, per_turn=3, spent=0))
+    obj.ask_verbatim = ("our monthly vendor spend report takes 3 days to "
+                        "compile by hand")
+    obj.request_type = "data_request"
+    await store.put_version(obj)
+    session = {"session_id": "s-budget", "req_id": obj.req_id, "turns": [],
+               "pending_questions": []}
+    await store.put_session(session)
+    result = await orchestrator.handle_turn(session, obj.ask_verbatim)
+    assert result.questions == []   # zero budget: analyst flags ask nothing

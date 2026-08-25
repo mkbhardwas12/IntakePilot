@@ -8,7 +8,12 @@ export interface Confirmation { confirmed_by: string; confirmed_at: string; edit
 export interface RoutingDecision { queue: string; confidence: number; explanation: string; alternatives: { queue: string; score: number }[]; }
 export interface AuditEvent { event: string; at: string; detail: string; }
 export interface ProcessMatch { key: string; label: string; confidence: number; evidence: string[]; }
-export interface UnstatedNeed { need: string; why: string; status: "open" | "covered"; covered_by: string | null; }
+export interface UnstatedNeed {
+  need: string; why: string; status: "open" | "covered"; covered_by: string | null;
+  candidate_slots: string[];
+  /** Requirements where this stayed open and the delivered result later missed the mark. */
+  evidence_count: number;
+}
 export interface AnalystRisk { risk: string; why: string; }
 export interface AnalystRead {
   process: ProcessMatch | null;

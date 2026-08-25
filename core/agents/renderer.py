@@ -28,7 +28,11 @@ def business_render(obj: RequirementObject, schema: SlotSchema) -> str:
         open_needs = [n for n in obj.analyst.unstated_needs if n.status == "open"]
         if open_needs:
             lines.append("_Worth deciding before build:_")
-            lines += [f"- {n.need} — {n.why}" for n in open_needs]
+            for n in open_needs:
+                evidence = (f" _(left open in {n.evidence_count} delivered "
+                            "requirement(s) that missed the mark)_"
+                            if n.evidence_count else "")
+                lines.append(f"- {n.need} — {n.why}{evidence}")
             lines.append("")
     for key, spec in schema.slots.items():
         if key == "business_outcome" or key in _SPECIAL_SLOTS:

@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from core.api.security import require_admin
+from core.export.manas_outbox import relay
 
 router = APIRouter(prefix="/api/export/outbox", tags=["export"],
                    dependencies=[Depends(require_admin)])
@@ -25,6 +26,13 @@ async def list_outbox(request: Request, state: str | None = None):
     filters = {"state": state} if state else {}
     rows = await _ctx(request).store.query_ledger("manas_outbox", **filters)
     return {"items": rows}
+
+
+@router.post("/ship")
+async def ship(request: Request):
+    """Trigger one relay pass now (the cron path is
+    `python -m core.export.manas_outbox.relay`)."""
+    return await relay.ship_pending(_ctx(request).store)
 
 
 class AckBody(BaseModel):

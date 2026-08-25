@@ -138,6 +138,28 @@ class PostgresStore:
         except asyncpg.UniqueViolationError as exc:
             raise AppendOnlyViolation(f"{obj.req_id} v{obj.version} already exists") from exc
 
+    async def put_version_with_outbox(self, obj: RequirementObject,
+                                      outbox_row: dict) -> None:
+        """Requirement version + MANAS outbox row in one transaction."""
+        import asyncpg
+        pool = await self._p()
+        cols = [c for c in LEDGER_COLS["manas_outbox"] if c in outbox_row]
+        vals = [outbox_row[c] for c in cols]
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                try:
+                    await conn.execute(
+                        "INSERT INTO requirements (req_id, version, obj) "
+                        "VALUES ($1,$2,$3::jsonb)",
+                        obj.req_id, obj.version, obj.model_dump_json())
+                except asyncpg.UniqueViolationError as exc:
+                    raise AppendOnlyViolation(
+                        f"{obj.req_id} v{obj.version} already exists") from exc
+                await conn.execute(
+                    f"INSERT INTO manas_outbox ({','.join(cols)}) "
+                    f"VALUES ({','.join(f'${i + 1}' for i in range(len(cols)))})",
+                    *vals)
+
     async def latest(self, req_id: str) -> RequirementObject:
         pool = await self._p()
         row = await pool.fetchrow(

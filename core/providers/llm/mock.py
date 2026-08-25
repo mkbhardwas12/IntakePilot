@@ -147,7 +147,8 @@ class MockLLM:
             ask = (ask_m.group(1).strip().rstrip(".") if ask_m else "the request")
             proc = proc_m.group(1).strip() if proc_m else "unplaced"
             if proc != "unplaced":
-                text = (f"At its core this is a {proc} need: {ask}. The outcome "
+                article = "an" if proc[:1].lower() in "aeiou" else "a"
+                text = (f"At its core this is {article} {proc} need: {ask}. The outcome "
                         "that matters to the business is a dependable, repeatable "
                         "result that removes the manual effort behind the ask.")
             else:

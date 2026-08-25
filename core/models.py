@@ -95,6 +95,12 @@ class UnstatedNeed(BaseModel):
     why: str
     status: str = "open"           # open | covered
     covered_by: str | None = None  # slot key that settled it, when covered
+    # In-schema slot keys that could settle it — the deterministic bridge
+    # from an open need to a question candidate.
+    candidate_slots: list[str] = []
+    # How many delivered requirements left this need open at confirm and were
+    # later adjudicated as missing the mark — production evidence it matters.
+    evidence_count: int = 0
 
 
 class AnalystRisk(BaseModel):

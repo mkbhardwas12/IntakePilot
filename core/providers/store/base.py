@@ -13,6 +13,10 @@ class AppendOnlyViolation(Exception):
 @runtime_checkable
 class Store(Protocol):
     async def put_version(self, obj: RequirementObject) -> None: ...   # append-only
+    # Requirement version + MANAS outbox row in ONE transaction (the honest
+    # transactional outbox — a crash can never separate the two writes).
+    async def put_version_with_outbox(self, obj: RequirementObject,
+                                      outbox_row: dict) -> None: ...
     async def latest(self, req_id: str) -> RequirementObject: ...
     async def history(self, req_id: str) -> list[RequirementObject]: ...
     async def log(self, table: str, row: dict) -> None: ...            # ledgers

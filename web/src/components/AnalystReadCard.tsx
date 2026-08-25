@@ -50,6 +50,14 @@ export function AnalystReadCard({ read }: { read: AnalystRead }) {
                   {n.status === "covered" && n.covered_by && (
                     <span className="need-covered-by"> · {n.covered_by.replace(/_/g, " ")}</span>
                   )}
+                  {n.status === "open" && n.evidence_count > 0 && (
+                    <span
+                      className="need-evidence"
+                      title={`Left open in ${n.evidence_count} delivered requirement(s) that missed the mark`}
+                    >
+                      missed ×{n.evidence_count}
+                    </span>
+                  )}
                 </span>
               </li>
             ))}

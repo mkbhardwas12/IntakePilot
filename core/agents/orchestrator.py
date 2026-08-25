@@ -162,6 +162,32 @@ class Orchestrator:
     def schema_for(self, request_type: str) -> SlotSchema:
         return self.schemas.get(request_type, self.schema)
 
+    @staticmethod
+    def _analyst_candidates(obj: RequirementObject, schema: SlotSchema,
+                            asked_before: set[str],
+                            gaps: list[str]) -> list[gap_analyzer.RankedGap]:
+        """Open analyst needs whose covering slot is askable, empty, and not
+        already a gap-driven question. Deterministic: the knowledge base
+        names the slot, the slot schema decides askability, and the budget
+        (enforced downstream) still caps everything."""
+        if obj.analyst is None:
+            return []
+        seen = set(gaps) | asked_before
+        out: list[gap_analyzer.RankedGap] = []
+        for need in obj.analyst.unstated_needs:
+            if need.status != "open":
+                continue
+            for key in need.candidate_slots:
+                spec = schema.slots.get(key)
+                if (spec is None or not spec.askable or key in seen
+                        or not gap_analyzer.is_empty(obj.slots.get(key))):
+                    continue
+                seen.add(key)
+                out.append(gap_analyzer.RankedGap(
+                    key=key, score=0.0,
+                    because=f"the analyst flags: {need.need.lower()}"))
+        return out
+
     def lock_for(self, req_id: str) -> asyncio.Lock:
         """Per-requirement mutex shared by turns AND confirm, so a confirm can
         never interleave with an in-flight turn (or another confirm) and race
@@ -349,18 +375,36 @@ class Orchestrator:
             if before.get(key) != slot.model_dump():
                 await send("slot", {"key": key, "slot": slot.model_dump()})
 
+        # 2.5 ANALYST READ — the BA interpretation of where this sits and what
+        # is still unsaid. Runs BEFORE questions so open needs can compete
+        # for question slots; advisory by construction (nothing here writes
+        # slots, routing, gates, or the budget), and a failure never costs
+        # the turn. Coverage is refreshed after defaults (step 4.6) so the
+        # streamed checklist reflects the turn's final slots.
+        if interactive and obj.ask_verbatim:
+            await send("status", {"stage": "interpreting"})
+            try:
+                obj.analyst = await analyst.read(self.llm, obj, schema,
+                                                 store=self.store)
+            except Exception as exc:  # noqa: BLE001 — advisory, never blocking
+                obj.touch("analyst_read_failed", str(exc)[:200])
+
         # 3. QUESTIONS (budget enforced in code, NOT in prompt)
         if self.cfg.budget_dynamic:
             obj.question_budget.max = dynamic_budget_max(obj, self.cfg)
         questions: list[Question] = []
-        if (interactive and gaps and not degraded
+        asked_before = {e.detail.split(":", 1)[0] for e in obj.audit
+                        if e.event == "question_asked"}
+        analyst_gaps = self._analyst_candidates(obj, schema, asked_before, gaps)
+        if (interactive and (gaps or analyst_gaps) and not degraded
                 and obj.question_budget.spent < obj.question_budget.max):
             await send("status", {"stage": "composing_questions"})
-            asked_before = {e.detail.split(":", 1)[0] for e in obj.audit
-                            if e.event == "question_asked"}
             ranked = await gap_analyzer.rank(obj, gaps, schema, asked_before,
                                              store=self.store)
             ranked = [g for g in ranked if schema.slots[g.key].askable]
+            # The analyst's open needs compete for the remaining capacity —
+            # always AFTER required gaps (score 0), never widening the budget.
+            ranked += analyst_gaps
             n = min(len(ranked), obj.question_budget.per_turn,
                     obj.question_budget.max - obj.question_budget.spent)
             questions = await question_composer.compose(
@@ -408,19 +452,11 @@ class Orchestrator:
                     key, "edited", "Human revised the Shadow Draft",
                     "mid_session_revision")
 
-        # 4.5 ANALYST READ — the BA interpretation of where this sits and what
-        # is still unsaid. Recomputed each interactive turn so the unstated-
-        # needs checklist tracks the live slots; advisory by construction
-        # (nothing here feeds slots, routing, gates, or the budget), and a
-        # failure never costs the turn.
-        if interactive and obj.ask_verbatim:
-            await send("status", {"stage": "interpreting"})
-            try:
-                obj.analyst = await analyst.read(self.llm, obj, schema,
-                                                 store=self.store)
-                await send("analyst", obj.analyst.model_dump(mode="json"))
-            except Exception as exc:  # noqa: BLE001 — advisory, never blocking
-                obj.touch("analyst_read_failed", str(exc)[:200])
+        # 4.6 Refresh the analyst checklist against the turn's final slots
+        # (answers/defaults applied since the read) and stream it.
+        if interactive and obj.analyst is not None:
+            analyst.refresh_needs(obj.analyst, obj, schema)
+            await send("analyst", obj.analyst.model_dump(mode="json"))
 
         # 5. READINESS + RENDER + PERSIST (append version, stream deltas)
         await send("status", {"stage": "scoring"})

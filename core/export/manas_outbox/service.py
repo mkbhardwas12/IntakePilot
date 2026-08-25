@@ -53,23 +53,21 @@ def _pepper() -> bytes:
     return os.environ.get("MANAS_TENANT_PEPPER", "").encode("utf-8")
 
 
-async def _store_row(store, req_id: str, result) -> dict:
+def _row(req_id: str, result) -> dict:
     if result.ok:
-        row = {"req_id": req_id, **result.as_item(), "reason": None}
-    else:
-        row = {"req_id": req_id, "outbox_id": None,
-               "event_type": result.event_type, "content_hash": None,
-               "envelope_json": None, "state": "rejected",
-               "reason": result.reason}
-    await store.log("manas_outbox", row)
-    return row
+        return {"req_id": req_id, **result.as_item(), "reason": None}
+    return {"req_id": req_id, "outbox_id": None,
+            "event_type": result.event_type, "content_hash": None,
+            "envelope_json": None, "state": "rejected",
+            "reason": result.reason}
 
 
-async def record_requirement_versioned(store, obj, *, ticket_ref: str | None,
-                                       acceptance_text: str) -> dict | None:
-    """The version that went to build. Call after the routed version is
-    persisted, in the same request. Returns the outbox row, or None when
-    the outbox is off."""
+def build_requirement_versioned_row(obj, *, acceptance_text: str) -> dict | None:
+    """The version that went to build, as an outbox row ready to commit in
+    the SAME transaction as the version itself (put_version_with_outbox).
+    None when the outbox is off. change_ref is the IPR id — the org-governed
+    change handle that exists before build handoff and is reused verbatim by
+    the later adjudication, never reconstructed from a downstream ticket."""
     if not outbox_enabled():
         return None
     try:
@@ -78,7 +76,7 @@ async def record_requirement_versioned(store, obj, *, ticket_ref: str | None,
             binding,
             requirement_id=obj.req_id,
             requirement_version=obj.version,
-            change_id=change_id_from(ticket_ref, obj.req_id),
+            change_id=change_id_from(None, obj.req_id),
             request_type=obj.request_type,
             intent_text=obj.ask_verbatim,
             acceptance_criteria_text=acceptance_text or "none stated",
@@ -90,22 +88,21 @@ async def record_requirement_versioned(store, obj, *, ticket_ref: str | None,
     except Exception as exc:  # noqa: BLE001 — the outbox never costs a confirm
         logger.exception("outbox emit failed for %s", obj.req_id)
         result = _config_rejection(f"unexpected: {type(exc).__name__}")
-    return await _store_row(store, obj.req_id, result)
+    return _row(obj.req_id, result)
 
 
-async def record_outcome_adjudicated(store, obj, *, verdict: str, role: str,
-                                     receipt_text: str, evidence_text: str,
-                                     deployment_ref: str | None,
-                                     deployment_source_binding: str | None,
-                                     change_id: str) -> dict | None:
-    """A human adjudication of the delivered result. The deployment
-    attestation (ref + binding) is originated by the delivery system and
-    presented by the caller — IntakePilot never fabricates it; without one
-    the adjudication stays local and the outbox records why."""
+def build_outcome_adjudicated_row(obj, *, verdict: str, role: str,
+                                  receipt_text: str, evidence_text: str,
+                                  deployment_ref: str | None,
+                                  deployment_source_binding: str | None) -> dict | None:
+    """A human adjudication of the delivered result, as an outbox row. The
+    deployment attestation (ref + binding) is originated by the delivery
+    system and presented by the caller — IntakePilot never fabricates it;
+    without one the adjudication stays local and the outbox records why."""
     if not outbox_enabled():
         return None
     if not deployment_ref or not deployment_source_binding:
-        return await _store_row(store, obj.req_id, _config_rejection(
+        return _row(obj.req_id, _config_rejection(
             "no deployment attestation presented — adjudication kept local"))
     try:
         binding = OutboxBinding.from_env()
@@ -117,7 +114,7 @@ async def record_outcome_adjudicated(store, obj, *, verdict: str, role: str,
             requirement_id=obj.req_id,
             requirement_version=obj.version,
             requirement_source_binding=binding.source_binding,
-            change_id=change_id,
+            change_id=change_id_from(None, obj.req_id),
             change_source_binding=binding.source_binding,
             verdict=verdict,
             adjudicated_by_role=role,
@@ -132,7 +129,7 @@ async def record_outcome_adjudicated(store, obj, *, verdict: str, role: str,
     except Exception as exc:  # noqa: BLE001
         logger.exception("outbox emit failed for %s", obj.req_id)
         result = _config_rejection(f"unexpected: {type(exc).__name__}")
-    return await _store_row(store, obj.req_id, result)
+    return _row(obj.req_id, result)
 
 
 class _config_rejection:

@@ -2688,3 +2688,14 @@ input {
   font-size: 12px;
   margin-top: 2px;
 }
+
+.need-evidence {
+  margin-left: 7px;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 13%, transparent);
+  white-space: nowrap;
+}
