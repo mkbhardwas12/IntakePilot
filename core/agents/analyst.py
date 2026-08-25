@@ -25,6 +25,7 @@ from __future__ import annotations
 import re
 from functools import lru_cache
 from pathlib import Path
+from typing import Mapping
 
 import yaml
 
@@ -52,13 +53,20 @@ def load_knowledge() -> dict:
         return yaml.safe_load(fh)
 
 
-def classify_process(text: str) -> ProcessMatch | None:
+def classify_process(text: str,
+                     learned: Mapping[str, list[str]] | None = None) -> ProcessMatch | None:
     """Deterministic placement: most signal votes wins; ties break by taxonomy
-    order (stable). Returns None when nothing in the ask votes at all."""
+    order (stable). Returns None when nothing in the ask votes at all.
+
+    ``learned`` merges human-accepted signals from the analyst_signals ledger
+    (mined from production asks, accepted via /api/analyst/signals) with the
+    static taxonomy — the self-improvement loop, still with a human between
+    the data and the knowledge."""
     low = text.lower()
     best: tuple[int, str, dict, list[str]] | None = None
     for key, entry in load_knowledge()["processes"].items():
-        hits = [s for s in entry.get("signals", [])
+        signals = list(entry.get("signals", [])) + list((learned or {}).get(key, []))
+        hits = [s for s in signals
                 if re.search(rf"\b{re.escape(s.lower())}\b", low)]
         if hits and (best is None or len(hits) > best[0]):
             best = (len(hits), key, entry, hits)
@@ -125,15 +133,21 @@ def _build_messages(obj: RequirementObject, match: ProcessMatch | None,
     return [Msg(role="system", content=system), Msg(role="user", content=user)]
 
 
-async def read(llm, obj: RequirementObject, schema: SlotSchema) -> AnalystRead:
+async def read(llm, obj: RequirementObject, schema: SlotSchema,
+               store=None) -> AnalystRead:
     """Produce the analyst's read for the current draft. Never raises: any
-    model failure degrades to the deterministic interpretation."""
+    model failure degrades to the deterministic interpretation. With a store,
+    placement also uses the human-accepted learned signals."""
     know = load_knowledge()
     corpus = obj.ask_verbatim
     outcome = obj.slots.get("business_outcome")
     if outcome and outcome.value:
         corpus += " " + str(outcome.value)
-    match = classify_process(corpus)
+    learned = None
+    if store is not None:
+        from core.learning import analyst_signals
+        learned = await analyst_signals.learned_signals(store)
+    match = classify_process(corpus, learned)
     entry = know["processes"][match.key] if match else know["general"]
 
     needs = _needs(entry, obj, schema)

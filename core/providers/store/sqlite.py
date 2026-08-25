@@ -27,6 +27,13 @@ LEDGER_TABLES = {
     "system_kb": ["system", "entity", "label", "schema", "evidence_count",
                   "verified", "last_refreshed"],
     "shares": ["token", "req_id", "created_at", "expires_at", "payload"],
+    # MANAS transactional outbox: envelopes committed alongside the domain
+    # write; an external relay ships state=pending rows and acknowledges them.
+    "manas_outbox": ["outbox_id", "req_id", "event_type", "content_hash",
+                     "envelope_json", "state", "reason", "created_at"],
+    # Human-accepted process signals mined from production asks — the
+    # analyst's taxonomy learning loop (proposals are never auto-applied).
+    "analyst_signals": ["process", "signal", "accepted_by", "created_at"],
 }
 
 _JSON_COLS = {"proposed", "corrected", "ask_embedding", "detail", "maps_to",

@@ -416,7 +416,8 @@ class Orchestrator:
         if interactive and obj.ask_verbatim:
             await send("status", {"stage": "interpreting"})
             try:
-                obj.analyst = await analyst.read(self.llm, obj, schema)
+                obj.analyst = await analyst.read(self.llm, obj, schema,
+                                                 store=self.store)
                 await send("analyst", obj.analyst.model_dump(mode="json"))
             except Exception as exc:  # noqa: BLE001 — advisory, never blocking
                 obj.touch("analyst_read_failed", str(exc)[:200])

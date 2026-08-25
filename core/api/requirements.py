@@ -10,6 +10,7 @@ from core.api.security import require_admin
 
 from core.models import Confirmation, Provenance, Slot, Status, coerce_edit
 from core.agents import acceptance, enrichment, impact, precedent, renderer
+from core.export.manas_outbox import service as manas_service
 from core.gates import pipeline, routing
 from core.learning import exemplars as learning
 
@@ -111,6 +112,72 @@ async def reroute(req_id: str, body: RerouteBody, request: Request):
     from the assigned team's side). Guarded by INTAKEPILOT_ADMIN_TOKEN when
     configured; the GitHub webhook path is guarded by its HMAC secret."""
     return await apply_reroute(_ctx(request), req_id, body.queue.strip())
+
+
+class AdjudicateBody(BaseModel):
+    # The pack's closed sets — validated here so a typo is a 422, not a
+    # rejected envelope.
+    verdict: str                      # achieved | partially_achieved | not_achieved
+    adjudicated_by_role: str          # business_owner | product_owner
+    receipt: str                      # the human judgement, in their words (stays local)
+    evidence: str | None = None       # what was looked at; hashed for the wire
+    # Deployment attestation, originated by the delivery system and presented
+    # here — IntakePilot never fabricates it. Optional: without it the
+    # adjudication is recorded locally and the outbox logs why it stayed local.
+    deployment_ref: str | None = None
+    deployment_source_binding: str | None = None
+
+
+@router.post("/{req_id}/adjudicate", dependencies=[Depends(require_admin)])
+async def adjudicate(req_id: str, body: AdjudicateBody, request: Request):
+    """The human judgement that the delivered result met the need — delivery
+    status is not success. Terminal learning signal locally, and (when the
+    outbox is enabled) the outcome.adjudicated.v1 event MANAS consumes."""
+    ctx = _ctx(request)
+    if body.verdict not in manas_service.VERDICTS:
+        raise HTTPException(422, f"verdict must be one of {manas_service.VERDICTS}")
+    if body.adjudicated_by_role not in manas_service.ADJUDICATOR_ROLES:
+        raise HTTPException(422, f"adjudicated_by_role must be one of "
+                                 f"{manas_service.ADJUDICATOR_ROLES}")
+    if not body.receipt.strip():
+        raise HTTPException(422, "receipt must not be empty")
+
+    async with ctx.orchestrator.lock_for(req_id):
+        obj = await _latest(ctx, req_id)
+        if obj.status not in (Status.ROUTED, Status.BUILDING,
+                              Status.IN_REVIEW, Status.DONE):
+            raise HTTPException(409, "only routed or delivered requirements can "
+                                     f"be adjudicated (status is {obj.status.value})")
+        obj.version += 1
+        obj.touch("adjudicated",
+                  f"{body.verdict} by {body.adjudicated_by_role}")
+        if body.verdict == "achieved":
+            obj.status = Status.DONE
+        await ctx.store.put_version(obj)
+
+    await ctx.store.log("outcome_ledger", {
+        "req_id": req_id, "stage": "adjudicated", "verdict": body.verdict,
+        "detail": {"role": body.adjudicated_by_role,
+                   "receipt": body.receipt,
+                   "bucket": obj.context_bucket}})
+
+    # change_ref continuity: reuse the routed ticket handle, never reconstruct.
+    ticket_ref = None
+    for row in await ctx.store.query_ledger("outcome_ledger", req_id=req_id,
+                                            stage="routed"):
+        ticket = (row.get("detail") or {}).get("ticket") or {}
+        ticket_ref = ticket.get("ref") or ticket_ref
+    outbox = await manas_service.record_outcome_adjudicated(
+        ctx.store, obj, verdict=body.verdict, role=body.adjudicated_by_role,
+        receipt_text=body.receipt, evidence_text=body.evidence or "",
+        deployment_ref=body.deployment_ref,
+        deployment_source_binding=body.deployment_source_binding,
+        change_id=manas_service.change_id_from(ticket_ref, req_id))
+
+    return {"req_id": req_id, "verdict": body.verdict,
+            "status": obj.status.value,
+            "outbox": ({"state": outbox["state"], "reason": outbox.get("reason")}
+                       if outbox else {"state": "disabled"})}
 
 
 class AttachBody(BaseModel):
@@ -354,6 +421,32 @@ async def _confirm_locked(ctx, req_id: str, body: ConfirmBody):
                 "req_id": req_id, "stage": "routed", "verdict": "ticket_failed",
                 "detail": {"queue": decision.queue, "error": str(exc)[:300]}})
             ticket = None
+
+    # Analyst learning evidence: what the analyst believed at the moment a
+    # human confirmed. Feeds the signal-proposal miner (never auto-applied).
+    if obj.analyst is not None:
+        await ctx.store.log("outcome_ledger", {
+            "req_id": req_id, "stage": "analyst",
+            "verdict": obj.analyst.process.key if obj.analyst.process else "unplaced",
+            "detail": {
+                "bucket": obj.context_bucket,
+                "ask": obj.ask_verbatim,
+                "confidence": obj.analyst.process.confidence if obj.analyst.process else 0,
+                "open_needs": [n.need for n in obj.analyst.unstated_needs
+                               if n.status == "open"]}})
+
+    # MANAS demand-lobe outbox (default-off): the exact version that went to
+    # build, committed alongside the domain write. An external relay ships
+    # pending rows; a rejection is an auditable row, never a failed confirm.
+    if obj.status == Status.ROUTED:
+        acceptance_text = acceptance.section(acceptance_scenarios)
+        if not acceptance_text:
+            sc = obj.slots.get("success_criteria")
+            acceptance_text = str(sc.value) if sc and sc.value else ""
+        await manas_service.record_requirement_versioned(
+            ctx.store, obj,
+            ticket_ref=ticket.ref if ticket else None,
+            acceptance_text=acceptance_text)
 
     return {"draft": obj.model_dump(mode="json"),
             "gates": [g.model_dump() for g in gates],

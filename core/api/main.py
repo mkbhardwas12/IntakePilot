@@ -9,8 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from core.api.context import AppContext
 from core.api.middleware import RateLimitMiddleware, RequestLogMiddleware
-from core.api import (channels, evals, glossary, graph, kb, metrics,
-                      requirements, sessions, share, triage, webhooks)
+from core.api import (analyst, channels, evals, export, glossary, graph, kb,
+                      metrics, requirements, sessions, share, triage, webhooks)
 
 
 def _cors_origins() -> list[str]:
@@ -70,6 +70,8 @@ def create_app(ctx: AppContext | None = None) -> FastAPI:
     app.include_router(webhooks.router)
     app.include_router(channels.router)
     app.include_router(graph.router)
+    app.include_router(analyst.router)
+    app.include_router(export.router)
     return app
 
 

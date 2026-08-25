@@ -172,3 +172,62 @@ async def test_revision_only_turn_does_not_recompute_the_read(orchestrator, stor
     await orchestrator.handle_turn(
         session, "", revisions={"urgency": "this month"}, emit=emit)
     assert "analyst" not in events
+
+
+# ------------------------------------------------------------------ the learning loop
+
+from core.learning import analyst_signals
+
+
+async def _log_analyst(store, ask: str, process: str | None):
+    await store.log("outcome_ledger", {
+        "req_id": "IPR-X", "stage": "analyst",
+        "verdict": process or "unplaced",
+        "detail": {"ask": ask, "confidence": 0.5, "open_needs": []}})
+
+
+async def test_recurring_terms_become_signal_proposals(store):
+    for i in range(3):
+        await _log_analyst(store, f"freight invoices from vendor {i} keep "
+                                  "mismatching the purchase order", "procure_to_pay")
+    proposals = await analyst_signals.signal_proposals(store)
+    freight = [p for p in proposals if p["signal"] == "freight"]
+    assert freight and freight[0]["process"] == "procure_to_pay"
+    assert freight[0]["occurrences"] == 3
+    # Terms already in the taxonomy are never proposed.
+    assert not any(p["signal"] in ("vendor", "purchase") for p in proposals)
+
+
+async def test_unplaced_asks_surface_unassigned_candidates(store):
+    for i in range(3):
+        await _log_analyst(store, f"the quarterly forecasting pack {i} is "
+                                  "late again", None)
+    proposals = await analyst_signals.signal_proposals(store)
+    cand = [p for p in proposals if p["signal"] == "forecasting"]
+    assert cand and cand[0]["process"] is None
+
+
+async def test_accepted_signal_changes_future_placement(llm, store, schema):
+    obj = make_obj(ask="the freight reconciliation is late every month")
+    read = await analyst_agent_read(llm, obj, schema, store)
+    assert read.process is None or read.process.key != "procure_to_pay"
+
+    await store.log("analyst_signals", {
+        "process": "procure_to_pay", "signal": "freight", "accepted_by": "t"})
+    read = await analyst_agent_read(llm, obj, schema, store)
+    assert read.process is not None and read.process.key == "procure_to_pay"
+    assert "freight" in read.process.evidence
+
+
+async def analyst_agent_read(llm, obj, schema, store):
+    return await analyst.read(llm, obj, schema, store=store)
+
+
+async def test_proposals_exclude_already_accepted_signals(store):
+    for i in range(3):
+        await _log_analyst(store, f"freight run {i} against the vendor master",
+                           "procure_to_pay")
+    await store.log("analyst_signals", {
+        "process": "procure_to_pay", "signal": "freight", "accepted_by": "t"})
+    proposals = await analyst_signals.signal_proposals(store)
+    assert not any(p["signal"] == "freight" for p in proposals)

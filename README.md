@@ -358,7 +358,23 @@ Implemented and verified (spec milestones 1–5 core, plus gates/routing from 6)
   one LLM-composed part (validated, deterministic fallback); it is advisory
   by construction — nothing in it feeds slots, routing, gates, or the budget.
   Streamed as an `analyst` SSE event, shown in the draft column, included in
-  the confirm render
+  the confirm render. The taxonomy learns from production: every confirm
+  logs what the analyst believed, recurring vocabulary the taxonomy is
+  missing surfaces as proposals (`GET /api/analyst/proposals`), and a human
+  accept (`POST /api/analyst/signals`) makes the term a recognition signal —
+  mined from data, human-approved, never auto-applied
+- MANAS demand-lobe outbox, wired (default-off, `MANAS_OUTBOX_ENABLED=true`
+  plus the `MANAS_*` binding and tenant pepper): confirming a routed
+  requirement commits an `io.manas.demand.requirement.versioned.v2` envelope
+  to a transactional outbox table alongside the domain write — an HMAC
+  commitment to the intent, never the business narrative itself; the new
+  human adjudication endpoint (`POST /api/requirements/{id}/adjudicate`,
+  verdict achieved/partially_achieved/not_achieved by a business or product
+  owner) records the terminal judgement locally and, when the delivery
+  system's deployment attestation is presented, emits
+  `outcome.adjudicated.v1`. A relay reads and acknowledges via
+  `GET/POST /api/export/outbox`; misconfiguration becomes an auditable
+  rejected row, never a failed confirm
 - Attachment validation (`core/attachments/` +
   `POST /api/sessions/{id}/attachments`, paperclip in the intake chat): a
   streaming, stdlib-only `.xlsx` reader (no size/row/cell-length caps,

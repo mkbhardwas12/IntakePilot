@@ -62,6 +62,18 @@ CREATE TABLE IF NOT EXISTS shares (
   expires_at TIMESTAMPTZ,
   payload JSONB);
 
+CREATE TABLE IF NOT EXISTS manas_outbox (
+  id BIGSERIAL PRIMARY KEY,
+  outbox_id TEXT, req_id TEXT, event_type TEXT,
+  content_hash TEXT, envelope_json TEXT,
+  state TEXT, reason TEXT,
+  created_at TIMESTAMPTZ DEFAULT now());
+
+CREATE TABLE IF NOT EXISTS analyst_signals (
+  id BIGSERIAL PRIMARY KEY,
+  process TEXT, signal TEXT, accepted_by TEXT,
+  created_at TIMESTAMPTZ DEFAULT now());
+
 CREATE TABLE IF NOT EXISTS seq (year INT PRIMARY KEY, n INT);
 
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS decisions JSONB;
@@ -77,6 +89,9 @@ LEDGER_COLS = {
     "system_kb": ["system", "entity", "label", "schema", "evidence_count",
                   "verified", "last_refreshed"],
     "shares": ["token", "req_id", "created_at", "expires_at", "payload"],
+    "manas_outbox": ["outbox_id", "req_id", "event_type", "content_hash",
+                     "envelope_json", "state", "reason"],
+    "analyst_signals": ["process", "signal", "accepted_by"],
 }
 _JSON_COLS = {"proposed", "corrected", "ask_embedding", "detail", "maps_to",
               "schema", "payload"}
