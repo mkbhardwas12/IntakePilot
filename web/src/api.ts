@@ -1,4 +1,5 @@
 import type {
+  AttachmentReport,
   ConfirmResponse,
   DecisionEvent,
   GateResult,
@@ -18,7 +19,10 @@ export interface SchemaResponse {
   slots: Record<string, SlotSchemaEntry>;
 }
 export interface SessionCreateResponse { session_id: string; req_id: string; draft: RequirementObject; }
-export interface SessionTurnEntry { role: "user" | "assistant"; text: string; at: string; }
+export interface SessionTurnEntry {
+  role: "user" | "assistant"; text: string; at: string;
+  attachment?: AttachmentReport;
+}
 export interface SessionDetail {
   session_id: string; req_id: string; draft: RequirementObject;
   pending_questions: Question[]; turns: SessionTurnEntry[];
@@ -83,6 +87,14 @@ export function createSession(requester?: { name: string; dept: string; role: st
 
 export function getSession(sessionId: string): Promise<SessionDetail> {
   return fetch(`/api/sessions/${sessionId}`).then((r) => toJson<SessionDetail>(r));
+}
+
+/** Raw bytes, not multipart — the API has no multipart dependency by design. */
+export function uploadAttachment(sessionId: string, file: File): Promise<AttachmentReport> {
+  return fetch(
+    `/api/sessions/${sessionId}/attachments?filename=${encodeURIComponent(file.name)}`,
+    { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: file }
+  ).then((r) => toJson<AttachmentReport>(r));
 }
 
 /** Requirements are session-bound: the API rejects calls without the

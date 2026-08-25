@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createSession, getSchema, getSession, sendTurn } from "../api";
+import { createSession, getSchema, getSession, sendTurn, uploadAttachment } from "../api";
 import type { TurnAnswer, TurnStage } from "../api";
 import type { ConfirmResponse, DecisionEvent, Question, RequirementObject, SlotSchemaEntry } from "../types";
 import { useToast } from "../toast";
@@ -46,6 +46,7 @@ export function IntakePage() {
   const [view, setView] = useState<View>("intake");
   const [confirmResult, setConfirmResult] = useState<ConfirmResponse | null>(null);
   const [demoPlaying, setDemoPlaying] = useState(false);
+  const [attaching, setAttaching] = useState(false);
 
   const nextMsgId = useRef(1);
   const pulseTimers = useRef<Map<string, number>>(new Map());
@@ -152,7 +153,8 @@ export function IntakePage() {
                 id: nextMsgId.current++,
                 role: t.role,
                 text: t.text,
-                questions: t.role === "assistant" ? s.pending_questions : undefined,
+                questions: t.role === "assistant" && !t.attachment ? s.pending_questions : undefined,
+                attachment: t.attachment,
               }))
             );
           }
@@ -268,6 +270,25 @@ export function IntakePage() {
     [pendingAnswers, currentQuestions, sendMessage]
   );
 
+  const attachFile = useCallback(
+    async (file: File) => {
+      if (!sessionId || attaching) return;
+      setAttaching(true);
+      pushMessage({ role: "user", text: `Attached ${file.name}` });
+      try {
+        const report = await uploadAttachment(sessionId, file);
+        pushMessage({ role: "assistant", text: report.summary, attachment: report });
+      } catch (err: unknown) {
+        const detail = err instanceof Error ? err.message : String(err);
+        pushMessage({ role: "assistant", text: `Attachment check failed: ${detail}`, error: true });
+        toast(`Attachment check failed: ${detail}`);
+      } finally {
+        setAttaching(false);
+      }
+    },
+    [sessionId, attaching, pushMessage, toast]
+  );
+
   const sendPendingAnswers = useCallback(() => {
     if (pendingAnswers.length === 0) return;
     void sendMessage(pendingAnswers.map((a) => String(a.value)).join(" · "), pendingAnswers);
@@ -377,6 +398,8 @@ export function IntakePage() {
         onSend={(text) => void sendMessage(text)}
         onAnswer={answerQuestion}
         onSendAnswers={sendPendingAnswers}
+        onAttach={(file) => void attachFile(file)}
+        attaching={attaching}
         onPlayDemo={() => void playDemo()}
         demoPlaying={demoPlaying}
         requester={requester}

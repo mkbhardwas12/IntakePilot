@@ -32,6 +32,34 @@ export interface DecisionEvent {
   source: string | null;
 }
 export interface TurnResult { draft: RequirementObject; questions: Question[]; confirm_unlocked: boolean; degraded: boolean; }
+export type AttachmentSeverity = "blocking" | "warning" | "info";
+export type AttachmentVerdict = "ready" | "needs_fixes" | "unusable" | "unreadable";
+export interface AttachmentFinding {
+  code: string; severity: AttachmentSeverity; message: string; fix: string;
+  sheet?: string; ref?: string; column?: string; count?: number;
+  excerpt?: string; excerpt_of?: number;
+}
+export interface AttachmentSheet {
+  name: string; index: number; hidden: boolean;
+  header_row: number | null; headers: string[]; data_rows: number;
+  findings: AttachmentFinding[];
+}
+export interface AttachmentFieldCoverage {
+  requested: string; matched_column?: string; matched_sheet?: string;
+  match_kind?: "exact" | "normalised" | "contained";
+  populated?: number; blank_rows?: number;
+}
+export interface AttachmentFitness {
+  verdict: "ready" | "needs_fixes" | "unusable" | "not_assessable";
+  requested_fields: string[]; coverage_ratio: number;
+  covered: AttachmentFieldCoverage[]; missing: AttachmentFieldCoverage[];
+  unmapped_columns: string[]; findings: AttachmentFinding[];
+}
+export interface AttachmentReport {
+  filename: string; verdict: AttachmentVerdict; summary: string;
+  sheets: AttachmentSheet[]; fitness: AttachmentFitness | null;
+  findings: AttachmentFinding[];
+}
 export interface SlotSchemaEntry { required: boolean; askable: boolean; ask_hint?: string; default?: unknown; default_reason?: string; label: string; }
 export interface GateResult {
   gate: number; name: string; passed: boolean;

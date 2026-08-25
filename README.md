@@ -18,15 +18,20 @@ for an honest review of the spec and the choices made where it was silent.
 
 ## Quick look
 
-One intake, end to end — real UI, offline mock model, ~23 seconds.
-**New: X-ray Intake** — watch the gap ladder decide *infer / retrieve / ask*
-live, then share a cinematic replay (`/r/{token}`) with an OG card.
+One intake, end to end — real UI, offline mock model, ~24 seconds.
+**New: attachment check** — attach a spreadsheet mid-intake and it is
+validated instantly: verdict, findings with the exact cell to fix, and
+coverage of the fields the requirement asked for. Also: X-ray Intake —
+watch the gap ladder decide *infer / retrieve / ask* live, then share a
+cinematic replay (`/r/{token}`) with an OG card.
 
 ![IntakePilot demo: plain-language ask to routed ticket](docs/assets/demo.gif)
 
 *A plain-language ask becomes a live Shadow Draft with provenance badges and
-an X-ray Decision Rail; two batched questions; confirm; five gates; routed
-ticket. Hit **Play the 23-second demo**, then **Share this intake**.
+an X-ray Decision Rail; two batched questions; an attached spreadsheet is
+checked on the spot (title row above headers, numbers stored as text — each
+with the cell ref to fix); confirm; five gates; routed ticket. Hit
+**Play the 23-second demo**, then **Share this intake**.
 Launch notes: [docs/LAUNCH.md](docs/LAUNCH.md). Higher-quality video:
 [docs/assets/demo.mp4](docs/assets/demo.mp4).*
 
@@ -339,6 +344,14 @@ Implemented and verified (spec milestones 1–5 core, plus gates/routing from 6)
   corrections surface as glossary proposals (`GET /api/glossary/proposals`,
   human-accepted via `POST /api/glossary`); system-KB validation via
   `POST /api/kb/{system}/{entity}/validate`
+- Attachment validation (`core/attachments/` +
+  `POST /api/sessions/{id}/attachments`, paperclip in the intake chat): a
+  streaming, stdlib-only `.xlsx` reader (no size/row/cell-length caps,
+  zip-bomb and XXE guarded) inspects structure — title rows above headers,
+  duplicate/blank headers, `#REF!` errors, numbers or dates stored as text,
+  hidden tabs with data — and checks the columns against the fields the
+  requirement itself named (`data_fields`), returning a verdict with the
+  exact cell to fix in the requester's own words
 - ADDENDUM-01 backend-aware enrichment: `SystemConnector` protocol + fixture
   connector, post-confirm enrichment agent, `system_kb` ledger feeding the
   retrieval ladder, System-context section on routed tickets and in the
@@ -376,11 +389,11 @@ Spec'd for later (honest gaps):
 
 ## Repo layout
 
-Matches spec Section 3: `core/` (api, agents+prompts, gates, learning
-{exemplars, proposals, replay}, providers/{llm,store,vector,connector},
+Matches spec Section 3: `core/` (api, agents+prompts, attachments, gates,
+learning {exemplars, proposals, replay}, providers/{llm,store,vector,connector},
 targets, schemas, models.py, config.py), `web/`, `deploy/` (docker-compose +
 Dockerfiles + nginx), `scripts/` (ops_check.py live-API readiness sweep),
-`tests/` (136 tests: invariants, e2e, golden set, per-feature suites), `evals/golden/`,
+`tests/` (invariants, e2e, golden set, per-feature suites), `evals/golden/`,
 `docs/`, `examples/demo-repo/`.
 
 ## License

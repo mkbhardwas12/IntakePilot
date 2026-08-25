@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import uuid
 from datetime import datetime, timezone
@@ -10,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from core.attachments import analyze_attachment
 from core.models import Budget, RequirementObject, Requester, TurnResult
 from core.agents.request_type import classify_request_type
 
@@ -140,6 +142,41 @@ async def post_turn(session_id: str, body: TurnBody, request: Request,
                                       "X-Accel-Buffering": "no"})
 
 
+@router.post("/{session_id}/attachments")
+async def upload_attachment(session_id: str, request: Request,
+                            filename: str = "attachment.xlsx"):
+    """Validate an attached spreadsheet against the session's live draft.
+
+    Raw bytes in the body — no multipart, so the zero-dependency run path
+    stays honest. Deliberately no size cap: the analyzer streams, and its
+    contract is that nothing is rejected for being large. An unreadable file
+    is a 200 with verdict "unreadable", not an error — the report itself is
+    the answer the requester needs.
+    """
+    ctx = _ctx(request)
+    session = await ctx.store.get_session(session_id)
+    if session is None:
+        raise HTTPException(404, "session not found")
+    data = await request.body()
+    if not data:
+        raise HTTPException(422, "empty upload")
+
+    obj = await ctx.store.latest(session["req_id"])
+    report = await asyncio.to_thread(
+        analyze_attachment, io.BytesIO(data),
+        filename=filename[:255], slots=obj.slots)
+
+    # The report lives in the transcript (persisted as JSON), so a restored
+    # session re-renders the check without a schema change to the store.
+    now = datetime.now(timezone.utc).isoformat()
+    session["turns"].append({"role": "user", "text": f"Attached {report.filename}",
+                             "at": now})
+    session["turns"].append({"role": "assistant", "text": report.summary(),
+                             "at": now, "attachment": report.as_dict()})
+    await ctx.store.put_session(session)
+    return report.as_dict()
+
+
 @router.get("/{session_id}")
 async def get_session(session_id: str, request: Request):
     ctx = _ctx(request)
@@ -151,4 +188,6 @@ async def get_session(session_id: str, request: Request):
             "draft": obj.model_dump(mode="json"),
             "pending_questions": session.get("pending_questions", []),
             "turns": session.get("turns", []),
-            "decisions": session.get("decisions", [])}
+            "decisions": session.get("decisions", []),
+            "attachments": [t["attachment"] for t in session.get("turns", [])
+                            if t.get("attachment")]}

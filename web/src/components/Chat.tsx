@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { TurnStage } from "../api";
-import type { Budget, Question } from "../types";
+import type { AttachmentReport, Budget, Question } from "../types";
+import { AttachmentCard } from "./AttachmentCard";
 
 export interface ChatMessage {
   id: number;
@@ -10,6 +11,7 @@ export interface ChatMessage {
   questions?: Question[];
   degraded?: boolean;
   error?: boolean;
+  attachment?: AttachmentReport;
 }
 
 const STAGE_LABELS: Record<TurnStage, string> = {
@@ -42,6 +44,8 @@ interface ChatProps {
   onSend: (text: string) => void;
   onAnswer: (question: Question, value: string) => void;
   onSendAnswers: () => void;
+  onAttach?: (file: File) => void;
+  attaching?: boolean;
   onPlayDemo?: () => void;
   demoPlaying?: boolean;
   requester?: RequesterInfo;
@@ -50,10 +54,11 @@ interface ChatProps {
 
 export function Chat({
   messages, streaming, stage, budget, answered, disabled, pendingCount,
-  onSend, onAnswer, onSendAnswers, onPlayDemo, demoPlaying,
+  onSend, onAnswer, onSendAnswers, onAttach, attaching, onPlayDemo, demoPlaying,
   requester, onRequesterChange
 }: ChatProps) {
   const [input, setInput] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const liveRef = useRef<HTMLDivElement>(null);
   const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
@@ -150,6 +155,7 @@ export function Chat({
                   <div className="assistant-body">
                     {m.degraded && <span className="degraded-tag">degraded mode</span>}
                     <div className={`bubble assistant-bubble${m.error ? " error-bubble" : ""}`}>{m.text}</div>
+                    {m.attachment && <AttachmentCard report={m.attachment} />}
                     {m.questions && m.questions.length > 0 && (
                       <div className="question-cards">
                         {m.questions.map((q) => (
@@ -195,6 +201,41 @@ export function Chat({
           </div>
         )}
         <form className="chat-form" onSubmit={submit}>
+          {onAttach && (
+            <>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".xlsx"
+                className="attach-input"
+                aria-label="Attach a spreadsheet"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) onAttach(f);
+                  e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                className="attach-btn"
+                title="Attach a spreadsheet (.xlsx) — checked instantly"
+                aria-label="Attach a spreadsheet"
+                disabled={disabled || streaming || attaching}
+                onClick={() => fileRef.current?.click()}
+              >
+                {attaching ? (
+                  <span className="attach-spinner" aria-hidden="true" />
+                ) : (
+                  <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+                    <path
+                      d="M10.5 4.5 5.7 9.3a1.6 1.6 0 1 0 2.3 2.3l4.8-4.8a3.2 3.2 0 1 0-4.6-4.6L3.4 7"
+                      fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"
+                    />
+                  </svg>
+                )}
+              </button>
+            </>
+          )}
           <input
             className="chat-input"
             value={input}

@@ -2362,3 +2362,186 @@ input {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------- attachment check ---------- */
+
+.attach-input {
+  display: none;
+}
+
+.attach-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  flex: none;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  transition: border-color var(--ease), color var(--ease);
+}
+
+.attach-btn:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.attach-btn:disabled {
+  opacity: 0.45;
+}
+
+.attach-spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: attach-spin 0.7s linear infinite;
+}
+
+@keyframes attach-spin {
+  to { transform: rotate(360deg); }
+}
+
+.attach-card {
+  margin-top: 8px;
+  max-width: 560px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--ok);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  font-size: 13px;
+}
+
+.attach-card.verdict-needs_fixes {
+  border-left-color: var(--warn);
+}
+
+.attach-card.verdict-unusable,
+.attach-card.verdict-unreadable {
+  border-left-color: var(--danger);
+}
+
+.attach-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.attach-clip {
+  color: var(--text-dim);
+  flex: none;
+}
+
+.attach-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.attach-verdict {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.attach-verdict.verdict-ready {
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 13%, transparent);
+}
+
+.attach-verdict.verdict-needs_fixes {
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 13%, transparent);
+}
+
+.attach-verdict.verdict-unusable,
+.attach-verdict.verdict-unreadable {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 13%, transparent);
+}
+
+.attach-meta {
+  margin-top: 4px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.attach-findings {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.attach-finding {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.finding-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-top: 5px;
+  background: var(--text-faint);
+}
+
+.attach-finding.sev-blocking .finding-dot {
+  background: var(--danger);
+}
+
+.attach-finding.sev-warning .finding-dot {
+  background: var(--warn);
+}
+
+.finding-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.finding-msg {
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.finding-ref {
+  margin-left: 6px;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+
+.finding-fix {
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.attach-more {
+  margin-top: 8px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.attach-clean {
+  margin-top: 8px;
+  color: var(--text-dim);
+}
