@@ -15,45 +15,98 @@ def _fmt(value) -> str:
     return str(value)
 
 
+# Slots given a dedicated place in the document; anything else filled lands
+# under "Further details" so nothing silently disappears.
+_SECTIONED = {"business_outcome", "scope_boundaries", "data_fields",
+              "success_criteria", "stakeholders", "data_sensitivity",
+              "urgency"} | set(_SPECIAL_SLOTS)
+
+
+def _slot_line(obj: RequirementObject, schema: SlotSchema, key: str,
+               label: str | None = None) -> str | None:
+    slot = obj.slots.get(key)
+    if slot is None or slot.value in (None, "", []):
+        return None
+    spec = schema.slots.get(key)
+    shown = label or (spec.label if spec else key.replace("_", " ").title())
+    suffix = ""
+    if slot.provenance == Provenance.ASSUMED:
+        suffix = f" _(assumed \u2014 {slot.default_reason or 'default applied'})_"
+    elif slot.provenance == Provenance.RETRIEVED and slot.source:
+        suffix = f" _(from {slot.source})_"
+    return f"- **{shown}:** {_fmt(slot.value)}{suffix}"
+
+
 def business_render(obj: RequirementObject, schema: SlotSchema) -> str:
-    lines = [f"## Requirement {obj.req_id}", "",
-             f"**Original ask:** \u201c{obj.ask_verbatim}\u201d", ""]
+    """A document a sponsor could sign \u2014 problem, analyst's read, scope,
+    measures, risks and open decisions \u2014 not a slot dump. Every line
+    traces to a slot with provenance or to the analyst's curated knowledge."""
+    read = obj.analyst
+    lines = [f"## Requirement {obj.req_id}", ""]
+
+    lines += ["### Problem & objective", "",
+              f"**Original ask (verbatim):** \u201c{obj.ask_verbatim}\u201d", ""]
     outcome = obj.slots.get("business_outcome")
     if outcome and outcome.value:
-        lines += [f"**What should change:** {_fmt(outcome.value)}", ""]
-    if obj.analyst and obj.analyst.interpretation:
-        placed = (f" _(placed in {obj.analyst.process.label})_"
-                  if obj.analyst.process else "")
-        lines += [f"**Analyst's read:** {obj.analyst.interpretation}{placed}", ""]
-        open_needs = [n for n in obj.analyst.unstated_needs if n.status == "open"]
-        if open_needs:
-            lines.append("_Worth deciding before build:_")
-            for n in open_needs:
-                evidence = (f" _(left open in {n.evidence_count} delivered "
-                            "requirement(s) that missed the mark)_"
-                            if n.evidence_count else "")
-                lines.append(f"- {n.need} — {n.why}{evidence}")
-            lines.append("")
-    for key, spec in schema.slots.items():
-        if key == "business_outcome" or key in _SPECIAL_SLOTS:
-            continue  # special slots get their own structured sections
-        slot = obj.slots.get(key)
-        if slot is None or slot.value in (None, "", []):
-            continue
-        suffix = ""
-        if slot.provenance == Provenance.ASSUMED:
-            suffix = f" _(assumed — {slot.default_reason or 'default applied'})_"
-        elif slot.provenance == Provenance.RETRIEVED and slot.source:
-            suffix = f" _(from {slot.source})_"
-        lines.append(f"- **{spec.label}:** {_fmt(slot.value)}{suffix}")
+        lines += [f"**Objective:** {_fmt(outcome.value)}", ""]
+    if read and read.interpretation:
+        placed = f" _(placed in {read.process.label})_" if read.process else ""
+        lines += [f"**Analyst's read:** {read.interpretation}{placed}", ""]
+
+    scope = [_slot_line(obj, schema, "data_fields", "In scope (fields)"),
+             _slot_line(obj, schema, "scope_boundaries", "Out of scope")]
+    scope = [s for s in scope if s]
+    if scope:
+        lines += ["### Scope", "", *scope, ""]
+
+    measures = [m for m in
+                [_slot_line(obj, schema, "success_criteria", "Done when")] if m]
+    if read and read.kpis:
+        measures.append("- **The business will measure it by:** "
+                        + ", ".join(read.kpis))
+    if measures:
+        lines += ["### Success measures", "", *measures, ""]
+
+    people = [_slot_line(obj, schema, "stakeholders", "Stakeholders"),
+              _slot_line(obj, schema, "data_sensitivity", "Data sensitivity")]
+    people = [p for p in people if p]
+    if people:
+        lines += ["### People & sensitivity", "", *people, ""]
+
+    timeline = [t for t in [_slot_line(obj, schema, "urgency", "Needed by")] if t]
     cod = obj.slots.get("cost_of_delay")
     if cod and isinstance(cod.value, dict):
-        lines += ["", f"**Estimated cost of doing nothing:** "
-                      f"{value_agent.describe(cod.value)}"]
+        timeline.append(f"- **Cost of delay:** "
+                        f"{value_agent.describe(cod.value)}")
+    if timeline:
+        lines += ["### Timeline & value", "", *timeline, ""]
+
+    if read and read.risks:
+        lines += ["### Known risks in this kind of work", ""]
+        lines += [f"- {r.risk} \u2014 {r.why}" for r in read.risks]
+        lines.append("")
+
+    open_needs = [n for n in (read.unstated_needs if read else [])
+                  if n.status == "open"]
+    if open_needs:
+        lines += ["### Open decisions (settle before build)", ""]
+        for n in open_needs:
+            evidence = (f" _(left open in {n.evidence_count} delivered "
+                        "requirement(s) that missed the mark)_"
+                        if n.evidence_count else "")
+            lines.append(f"- {n.need} \u2014 {n.why}{evidence}")
+        lines.append("")
+
+    rest = [line for line in
+            (_slot_line(obj, schema, key) for key in schema.slots
+             if key not in _SECTIONED) if line]
+    if rest:
+        lines += ["### Further details", "", *rest, ""]
+
     if obj.assumptions:
-        lines += ["", f"_{len(obj.assumptions)} assumption(s) applied — "
-                      "review the assumption register before confirming._"]
-    return "\n".join(lines)
+        lines += [f"_{len(obj.assumptions)} assumption(s) applied \u2014 "
+                  "review the assumption register before confirming._"]
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def backend_context_section(obj: RequirementObject) -> list[str]:

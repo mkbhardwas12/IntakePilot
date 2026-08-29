@@ -48,7 +48,11 @@ export interface DecisionEvent {
   reason: string;
   source: string | null;
 }
-export interface TurnResult { draft: RequirementObject; questions: Question[]; confirm_unlocked: boolean; degraded: boolean; }
+export interface TurnResult {
+  draft: RequirementObject; questions: Question[]; confirm_unlocked: boolean; degraded: boolean;
+  /** The analyst's account of the turn, composed from what actually happened. */
+  narrative?: string;
+}
 export type AttachmentSeverity = "blocking" | "warning" | "info";
 export type AttachmentVerdict = "ready" | "needs_fixes" | "unusable" | "unreadable";
 export interface AttachmentFinding {

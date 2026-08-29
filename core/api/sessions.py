@@ -83,19 +83,13 @@ async def _run_turn(ctx, session: dict, body: TurnBody, emit=None) -> TurnResult
 
 
 def _assistant_summary(result: TurnResult) -> str:
-    parts = []
-    if result.degraded:
-        parts.append("I couldn't fully process that message, so I kept the draft as it was.")
-    if result.revised:
-        parts.append(f"Updated {result.revised} field(s) you revised.")
+    # The orchestrator composes the analyst's account of the turn from what
+    # actually happened; the counters are the fallback, not the voice.
+    if result.narrative:
+        return result.narrative
     filled = sum(1 for s in result.draft.slots.values() if s.value not in (None, "", []))
-    parts.append(f"Draft updated — {filled} slot(s) filled, "
-                 f"readiness {result.draft.readiness_score}.")
-    if result.questions:
-        parts.append(f"I have {len(result.questions)} question(s) to tighten this up.")
-    elif result.confirm_unlocked:
-        parts.append("This looks ready — review and confirm when you're happy.")
-    return " ".join(parts)
+    return (f"Draft updated — {filled} slot(s) filled, "
+            f"readiness {result.draft.readiness_score}.")
 
 
 @router.post("/{session_id}/turns")

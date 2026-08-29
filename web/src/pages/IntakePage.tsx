@@ -233,11 +233,12 @@ export function IntakePage() {
         setConfirmUnlocked(result.confirm_unlocked);
         setCurrentQuestions(result.questions);
         const assistantText =
-          result.questions.length > 0
+          result.narrative ||
+          (result.questions.length > 0
             ? "I need a few details to finish the draft."
             : result.confirm_unlocked
               ? "The draft looks ready — review it in the panel and hit Confirm."
-              : "Draft updated with what you told me.";
+              : "Draft updated with what you told me.");
         pushMessage({
           role: "assistant",
           text: assistantText,

@@ -147,6 +147,82 @@ def apply_defaults(obj: RequirementObject, remaining: list[str],
     return obj
 
 
+def _labels(schema: SlotSchema, keys: list[str]) -> str:
+    return ", ".join(schema.slots[k].label.lower() if k in schema.slots
+                     else k.replace("_", " ") for k in keys)
+
+
+def _turn_narrative(obj: RequirementObject, schema: SlotSchema,
+                    before: dict, questions: list[Question],
+                    confirm_unlocked: bool, degraded: bool,
+                    revised: int) -> str:
+    """What a senior analyst would say back after this turn — built from what
+    actually happened, not a canned line. Deterministic, so it is exactly as
+    sharp on the offline mock as on a frontier model."""
+    if degraded:
+        return ("I couldn't reliably process that message, so I kept the "
+                "draft exactly as it was — nothing was guessed. Try "
+                "rephrasing, or correct any field directly in the draft.")
+
+    parts: list[str] = []
+    if revised:
+        parts.append(f"Applied your {revised} correction(s) — those fields are "
+                     "now yours and nothing I extract will overwrite them.")
+
+    read = obj.analyst
+    if read and read.process:
+        parts.append(f"I'm reading this as {read.process.label} work"
+                     + (f" (that's what “{read.process.evidence[0]}” "
+                        "tells me)" if read.process.evidence else "") + ".")
+
+    changed = {k for k, s in obj.slots.items()
+               if before.get(k) != s.model_dump() and s.value not in (None, "", [])}
+    by_prov: dict[str, list[str]] = {}
+    for key in changed:
+        prov = obj.slots[key].provenance
+        if prov:
+            by_prov.setdefault(prov.value, []).append(key)
+    if by_prov.get("extracted"):
+        keys = [k for k in by_prov["extracted"] if k != "cost_of_delay"]
+        if keys:
+            parts.append(f"From your words I took {_labels(schema, sorted(keys))}.")
+    if by_prov.get("retrieved"):
+        parts.append(f"Rather than ask, I pulled {_labels(schema, sorted(by_prov['retrieved']))} "
+                     "from what this organisation already knows — check the "
+                     "X-ray for the exact source.")
+    if by_prov.get("inferred"):
+        parts.append(f"I inferred {_labels(schema, sorted(by_prov['inferred']))} "
+                     "from who you are; correct me if that's off.")
+    cod = obj.slots.get("cost_of_delay")
+    if "cost_of_delay" in changed and cod and isinstance(cod.value, dict):
+        hours = cod.value.get("annual_hours")
+        if hours:
+            parts.append(f"The cadence you described prices the status quo at "
+                         f"roughly {hours:,.0f} hours a year.")
+
+    if questions:
+        analyst_qs = [q for q in questions if "analyst flags" in (q.because or "")]
+        spent, cap = obj.question_budget.spent, obj.question_budget.max
+        line = (f"I have {len(questions)} question(s) — the ones that most "
+                f"change how this gets built ({spent} of {cap} used)")
+        if analyst_qs:
+            line += (f"; {len(analyst_qs)} of them I'm asking because "
+                     "requirements like this usually leave it unsaid")
+        parts.append(line + ".")
+    elif read:
+        open_needs = [n.need for n in read.unstated_needs if n.status == "open"]
+        if open_needs:
+            parts.append("Still worth pinning down before build: "
+                         + "; ".join(open_needs[:2]).lower() + ".")
+
+    if confirm_unlocked and not questions:
+        parts.append("Everything routing needs is here — review the draft, "
+                     "click any value to correct it, then confirm.")
+    if not parts:
+        parts.append("Draft updated — review the panel on the right.")
+    return " ".join(parts)
+
+
 class Orchestrator:
     def __init__(self, llm, store, vector, schema: SlotSchema, cfg: Config,
                  schemas: dict[str, SlotSchema] | None = None):
@@ -483,6 +559,8 @@ class Orchestrator:
         session["budget_spent"] = obj.question_budget.spent
         await self.store.put_session(session)
 
+        narrative = _turn_narrative(obj, schema, before, questions,
+                                    confirm_unlocked, degraded, revised)
         return TurnResult(draft=obj, questions=questions,
                           confirm_unlocked=confirm_unlocked, degraded=degraded,
-                          revised=revised)
+                          revised=revised, narrative=narrative)

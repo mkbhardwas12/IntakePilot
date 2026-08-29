@@ -165,6 +165,10 @@ class TurnResult(BaseModel):
     confirm_unlocked: bool = False
     degraded: bool = False
     revised: int = 0
+    # The analyst's account of the turn — composed deterministically from
+    # what actually happened (placements, fills by provenance, questions,
+    # open decisions), never from a template that ignores the turn.
+    narrative: str = ""
 
 
 class GateResult(BaseModel):

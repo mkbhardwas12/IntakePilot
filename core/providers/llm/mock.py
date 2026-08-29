@@ -142,18 +142,38 @@ class MockLLM:
         elif task.startswith("gate"):
             data = {"passed": True, "reason": None, "suggestion": None}
         elif task == "analyst":
-            ask_m = re.search(r"Ask:\s*(.+)", full)
-            proc_m = re.search(r"Process:\s*(.+)", full)
-            ask = (ask_m.group(1).strip().rstrip(".") if ask_m else "the request")
-            proc = proc_m.group(1).strip() if proc_m else "unplaced"
+            # Deterministic, but content-bearing: reuse the domain facts the
+            # prompt carries (stakeholders, failure modes, KPIs) so even the
+            # offline read sounds like an analyst, not a template.
+            def _line(label):
+                m = re.search(rf"{label}:\s*(.+)", full)
+                return m.group(1).strip() if m else ""
+            ask = (_line("Ask").rstrip(".") or "the request")
+            proc = _line("Process") or "unplaced"
+            stakeholders = _line("Typically at the table")
+            risk = (_line("Classic failure modes here").split(";")[0]
+                    .strip().rstrip("."))
+            kpis = _line("Measured by")
+            pain = re.search(r"([\d.]+\s*(?:hours?|days?|weeks?))", ask.lower())
+            cost = (f" — {pain.group(1)} of someone's time, every cycle,"
+                    " until this ships" if pain else "")
             if proc != "unplaced":
                 article = "an" if proc[:1].lower() in "aeiou" else "a"
-                text = (f"At its core this is {article} {proc} need: {ask}. The outcome "
-                        "that matters to the business is a dependable, repeatable "
-                        "result that removes the manual effort behind the ask.")
+                text = (f"Underneath the words this is {article} {proc} problem"
+                        f"{cost}. ")
+                if stakeholders and "(unknown)" not in stakeholders:
+                    text += (f"Expect {stakeholders} to own pieces of it, and "
+                             f"judge the result on {kpis.split(',')[0].strip()}. "
+                             if kpis and "(none" not in kpis else
+                             f"Expect {stakeholders} to own pieces of it. ")
+                if risk and "(none" not in risk:
+                    text += (f"The way this usually goes wrong: "
+                             f"{risk[0].lower() + risk[1:]}.")
+                text = text.strip()
             else:
-                text = (f"At its core the requester needs: {ask}. The outcome "
-                        "that matters is a dependable, repeatable result.")
+                text = (f"The requester's underlying need: {ask}{cost}. It "
+                        "doesn't yet match a known business process — worth a "
+                        "human look at where this work actually lives.")
             data = {"interpretation": text}
         elif task == "acceptance":
             ask_m = re.search(r"Ask:\s*(.+)", full)

@@ -136,20 +136,32 @@ def _fallback_interpretation(obj: RequirementObject,
 
 
 def _build_messages(obj: RequirementObject, match: ProcessMatch | None,
-                    needs: list[UnstatedNeed]) -> list[Msg]:
+                    needs: list[UnstatedNeed], entry: dict) -> list[Msg]:
     filled = {k: s.value for k, s in obj.slots.items()
               if s.value not in (None, "", []) and k != "backend_context"}
     open_needs = "; ".join(n.need for n in needs if n.status == "open") or "(none)"
+    stakeholders = ", ".join(entry.get("stakeholders", [])) or "(unknown)"
+    risks = "; ".join(r["risk"] for r in entry.get("risks", [])) or "(none catalogued)"
+    kpis = ", ".join(entry.get("kpis", [])) or "(none catalogued)"
     system = (
         "TASK: analyst\n"
-        "You are a senior business analyst. Restate what the requester is "
-        "actually trying to achieve — the underlying need behind the words — "
-        "in 2–3 plain sentences a non-technical sponsor would sign off on. "
-        "Use only the facts given; never invent systems, numbers, or names. "
-        "Do not list the open questions — they are shown separately. "
-        "Output JSON: {\"interpretation\": str}.")
+        "You are a principal business analyst with two decades of enterprise "
+        "process work; the requester deserves the read a great BA gives, not "
+        "a summary. In 2–3 plain sentences: (1) name the underlying business "
+        "need behind the words — what breaks or costs money if nothing "
+        "changes; (2) say what this means in the named business process — "
+        "who is affected and what the delivered change must respect there. "
+        "Be specific to THIS ask: quote its own numbers and nouns. Banned: "
+        "filler like 'dependable, repeatable result', 'streamline', "
+        "'leverage', restating the ask verbatim, inventing systems, numbers "
+        "or names not given, and listing the open questions (shown "
+        "separately). A non-technical sponsor should read it and say "
+        "'exactly'. Output JSON: {\"interpretation\": str}.")
     user = (f"Ask: {obj.ask_verbatim}\n"
             f"Process: {match.label if match else 'unplaced'}\n"
+            f"Typically at the table: {stakeholders}\n"
+            f"Classic failure modes here: {risks}\n"
+            f"Measured by: {kpis}\n"
             f"Known slots: {filled}\n"
             f"Still open for the analyst: {open_needs}")
     return [Msg(role="system", content=system), Msg(role="user", content=user)]
@@ -180,7 +192,7 @@ async def read(llm, obj: RequirementObject, schema: SlotSchema,
 
     try:
         data = await complete_validated(
-            llm, _build_messages(obj, match, needs), INTERPRETATION_SCHEMA)
+            llm, _build_messages(obj, match, needs, entry), INTERPRETATION_SCHEMA)
         interpretation = str(data.get("interpretation", "")).strip()
         source = "llm"
     except ExtractionError:
