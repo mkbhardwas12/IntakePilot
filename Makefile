@@ -1,4 +1,4 @@
-.PHONY: dev api web install hooks check-attribution test clean
+.PHONY: dev api web install hooks check-attribution test clean improve
 
 # Zero-dependency dev run: mock LLM + SQLite + local vector index.
 dev: install
@@ -26,3 +26,8 @@ test:
 
 clean:
 	rm -rf data/intakepilot.db data/vector_index.json examples/demo-repo/IPR-*.md
+
+# One improvement pass: ship the MANAS outbox (+health), harvest analyst/
+# glossary proposals, replay corrections as evals. Cron this.
+improve:
+	.venv/bin/python -m scripts.improve

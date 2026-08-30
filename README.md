@@ -392,6 +392,14 @@ Implemented and verified (spec milestones 1–5 core, plus gates/routing from 6)
   every attempt is an append-only row. Manual read/ack stays available via
   `GET/POST /api/export/outbox`; misconfiguration becomes an auditable
   rejected row, never a failed confirm
+- The standing improvement loop (`make improve` /
+  `python -m scripts.improve`, cron-friendly): one idempotent pass that
+  ships the MANAS outbox and reports its health (pending/dead-letter counts
+  so a stuck feed is visible), harvests the research surfaces — analyst
+  signal proposals and glossary proposals, for a human to accept, never
+  auto-applied — and replays every confirmation correction as an eval
+  against the current extraction stack, so drift shows up in the report
+  before it shows up with a requester
 - Attachment validation (`core/attachments/` +
   `POST /api/sessions/{id}/attachments`, paperclip in the intake chat): a
   streaming, stdlib-only `.xlsx` reader (no size/row/cell-length caps,

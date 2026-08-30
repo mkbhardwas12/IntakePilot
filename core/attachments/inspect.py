@@ -157,7 +157,9 @@ def _detect_header(buffered: list[list[Cell]]) -> int | None:
         return None
 
     widths = [len(r) for _, r in populated]
-    modal = max(set(widths), key=widths.count)
+    # Tie-break toward the wider shape: with equal votes, narrow rows are titles and notes,
+    # wide rows are the table. (Two title lines above two data rows is a real, observed case.)
+    modal = max(set(widths), key=lambda w: (widths.count(w), w))
     floor = max(1, int(modal * 0.6))
 
     for position, row in populated:

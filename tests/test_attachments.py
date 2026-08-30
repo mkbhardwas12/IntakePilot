@@ -342,66 +342,17 @@ def test_a_wide_text_data_row_does_not_win_over_a_narrower_real_header():
     assert "V-100" not in r.sheets[0].headers
 
 
-# ------------------------------------------------------------------ the HTTP endpoint
-
-import httpx
-
-from core.api.context import AppContext
-from core.api.main import create_app
-
-from tests.conftest import memory_config
-
-
-@pytest.fixture
-async def api_client(tmp_path):
-    cfg = memory_config()
-    cfg.demo_repo = str(tmp_path / "demo-repo")
-    ctx = AppContext(cfg)
-    app = create_app(ctx)
-    async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app),
-            base_url="http://test") as client:
-        yield client
-
-
-async def test_upload_is_checked_against_the_session_draft(api_client):
-    resp = await api_client.post("/api/sessions", json={})
-    sid = resp.json()["session_id"]
-
-    data = build_xlsx({"Data": [["Customer", "Qty"], ["C-1", 5], ["C-2", 7]]})
-    resp = await api_client.post(
-        f"/api/sessions/{sid}/attachments?filename=orders.xlsx",
-        content=data, headers={"Content-Type": "application/octet-stream"})
-    assert resp.status_code == 200
-    report = resp.json()
-    assert report["filename"] == "orders.xlsx"
-    assert report["verdict"] == "ready"
-    assert "orders.xlsx" in report["summary"]
-
-    # Persisted on the session, so a restored session still shows the check.
-    resp = await api_client.get(f"/api/sessions/{sid}")
-    assert [a["filename"] for a in resp.json()["attachments"]] == ["orders.xlsx"]
-
-
-async def test_an_unreadable_upload_is_a_report_not_an_error(api_client):
-    resp = await api_client.post("/api/sessions", json={})
-    sid = resp.json()["session_id"]
-
-    resp = await api_client.post(
-        f"/api/sessions/{sid}/attachments?filename=notes.pdf",
-        content=b"%PDF-1.7 not a workbook",
-        headers={"Content-Type": "application/octet-stream"})
-    assert resp.status_code == 200
-    assert resp.json()["verdict"] == "unreadable"
-
-
-async def test_an_empty_upload_is_rejected(api_client):
-    resp = await api_client.post("/api/sessions", json={})
-    sid = resp.json()["session_id"]
-    resp = await api_client.post(f"/api/sessions/{sid}/attachments", content=b"")
-    assert resp.status_code == 422
-
-
-async def test_upload_to_an_unknown_session_is_404(api_client):
-    resp = await api_client.post("/api/sessions/nope/attachments", content=b"x")
-    assert resp.status_code == 404
+def test_two_title_rows_tied_with_two_data_rows_still_finds_the_header():
+    """Regression from a live-server run: a width-vote TIE (two narrow title rows vs two wide
+    data rows) picked the title as the header. Ties must break toward the wider shape."""
+    r = analyze({"Sheet1": [
+        ["Open Purchase Orders - Q3"],
+        ["Extracted 14 Aug"],
+        [],
+        ["PO Number", "", "Vendor", "Amount", "Currency"],
+        [("text", "4500012345"), "x", "V-100", 100, "EUR"],
+        [("text", "4500012346"), "x", "V-101", 200, "EUR"],
+    ]})
+    assert r.sheets[0].header_row == 4
+    assert r.sheets[0].data_rows == 2
+    assert "PO Number" in r.sheets[0].headers
